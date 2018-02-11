@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"net/http"
 	"time"
@@ -11,6 +12,8 @@ import (
 var clients = make(map[*websocket.Conn]bool) // connected clients
 var broadcast = make(chan Message)           // broadcast channel
 
+var logstashServer = "ws://127.0.0.1:3232"
+
 // Configure the upgrader
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
@@ -18,7 +21,7 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
-// Define our message object
+// Message object
 type Message struct {
 	Email    string `json:"email"`
 	Username string `json:"username"`
@@ -35,12 +38,70 @@ func main() {
 
 	// Start listening for incoming chat messages
 	go handleMessages()
+	go handleTimeBot()
+
+	go connectLogstash()
 
 	// Start the server on localhost port 8000 and log any errors
 	log.Println("http server started on :8000")
 	err := http.ListenAndServe(":8000", nil)
 	if err != nil {
 		log.Fatal("ListenAndServe: ", err)
+	}
+}
+
+func connectLogstash() {
+	c, _, err := websocket.DefaultDialer.Dial(logstashServer, nil)
+
+	if err != nil {
+		log.Fatal("dial:", err)
+	}
+	log.Println("Connected to logstash")
+	defer c.Close()
+	done := make(chan struct{})
+
+	go func() {
+		defer c.Close()
+		defer close(done)
+		for {
+			_, message, err := c.ReadMessage()
+			if err != nil {
+				log.Println("read:", err)
+				return
+			}
+			log.Printf("recv: %s", message)
+			logStashMsg := Message{
+				Email:    "logstash",
+				Username: "LogstashBot",
+				Message:  fmt.Sprintf("%s", message)}
+			broadcast <- logStashMsg
+		}
+	}()
+
+	ticker := time.NewTicker(time.Second)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case t := <-ticker.C:
+			err := c.WriteMessage(websocket.TextMessage, []byte(t.String()))
+			if err != nil {
+				log.Println("write:", err)
+				return
+			}
+		}
+	}
+}
+
+func handleTimeBot() {
+	for {
+
+		timeMsg := Message{
+			Email:    "time",
+			Username: "TimeBot",
+			Message:  "Time: " + time.Now().Format("20060102150405")}
+		broadcast <- timeMsg
+		time.Sleep(2 * time.Second)
 	}
 }
 

@@ -16,6 +16,8 @@ var logstashServer = "ws://127.0.0.1:3232"
 
 // Configure the upgrader
 var upgrader = websocket.Upgrader{
+	ReadBufferSize:  1024,
+	WriteBufferSize: 1024,
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},

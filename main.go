@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -14,6 +16,19 @@ var broadcast = make(chan Message)           // broadcast channel
 
 var logstashServer = "ws://127.0.0.1:3232"
 
+// Clients is a strct of connected clients
+type Clients struct {
+	Connected bool
+	id        string
+}
+
+// LogstashMessage is the type received rom Logstash
+type LogstashMessage struct {
+	ReadyReplicas uint64
+	Host          string
+	Timestamp     string `json:"@timestamp"`
+}
+
 // Configure the upgrader
 var upgrader = websocket.Upgrader{
 	ReadBufferSize:  1024,
@@ -23,6 +38,16 @@ var upgrader = websocket.Upgrader{
 	},
 }
 
+type readOp struct {
+	key  int
+	resp chan int
+}
+type writeOp struct {
+	key  int
+	val  int
+	resp chan bool
+}
+
 // Message object
 type Message struct {
 	Email    string `json:"email"`
@@ -30,7 +55,14 @@ type Message struct {
 	Message  string `json:"message"`
 }
 
+// Metrics will collect metrics here!
+var state = make(map[string]int)
+var mutex = &sync.Mutex{}
+var readOps uint64
+var writeOps uint64
+
 func main() {
+
 	// Create a simple file server
 	fs := http.FileServer(http.Dir("./public"))
 	http.Handle("/", fs)
@@ -66,17 +98,17 @@ func connectLogstash() {
 		defer c.Close()
 		defer close(done)
 		for {
-			_, message, err := c.ReadMessage()
-			if err != nil {
-				log.Println("read:", err)
-				return
+			var lm LogstashMessage
+			if err := c.ReadJSON(&lm); err != nil {
+				log.Println("ReadJSON error:", err)
 			}
-			log.Printf("recv: %s", message)
+			log.Printf("recv: %+v", lm)
 			logStashMsg := Message{
 				Email:    "logstash",
 				Username: "LogstashBot",
-				Message:  fmt.Sprintf("%s", message)}
+				Message:  fmt.Sprintf("%+v", lm)}
 			broadcast <- logStashMsg
+			atomic.AddUint64(&readOps, 1)
 		}
 	}()
 
@@ -101,9 +133,9 @@ func handleTimeBot() {
 		timeMsg := Message{
 			Email:    "time",
 			Username: "TimeBot",
-			Message:  "Time: " + time.Now().Format("20060102150405")}
+			Message:  "Time: " + time.Now().Format("20060102150405") + " readOps: " + string(readOps)}
 		broadcast <- timeMsg
-		time.Sleep(2 * time.Second)
+		time.Sleep(60 * time.Second)
 	}
 }
 
@@ -149,7 +181,7 @@ func handleMessages() {
 		for client := range clients {
 			err := client.WriteJSON(msg)
 			if err != nil {
-				log.Printf("error: %v", err)
+				log.Printf("error: %+v", err)
 				client.Close()
 				delete(clients, client)
 			}

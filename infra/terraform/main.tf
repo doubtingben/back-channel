@@ -216,31 +216,7 @@ resource "google_compute_firewall" "irc_ssh" {
   target_tags   = ["irc-backend"]
 }
 
-data "google_compute_region_instance_group" "irc" {
-  name   = google_compute_region_instance_group_manager.irc.name
-  region = var.region
-}
 
-locals {
-  instance_self_links = data.google_compute_region_instance_group.irc.instances
-}
-
-data "google_compute_instance" "irc" {
-  for_each  = toset(local.instance_self_links)
-  self_link = each.value
-}
-
-locals {
-  instance_ips = [for inst in data.google_compute_instance.irc : inst.network_interface[0].access_config[0].nat_ip]
-}
-
-resource "local_file" "ansible_inventory" {
-  filename = "${path.module}/ansible/inventory.ini"
-  content = templatefile("${path.module}/inventory.tmpl", {
-    hosts = local.instance_ips
-    user  = var.ssh_username
-  })
-}
 
 resource "cloudflare_dns_record" "irc" {
   count   = var.cloudflare_manage_dns ? 1 : 0

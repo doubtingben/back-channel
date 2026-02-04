@@ -23,7 +23,4 @@ output "irc_oper_password_secret" {
   description = "Secret Manager secret id for IRC operator password."
 }
 
-output "ansible_inventory_path" {
-  value       = local_file.ansible_inventory.filename
-  description = "Path to the generated Ansible inventory."
-}
+

@@ -1,1 +1,3 @@
-back-channel
+back-channel.terraform/
+*.tfstate
+*.tfstate.backup

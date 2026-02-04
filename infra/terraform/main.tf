@@ -1,4 +1,8 @@
 terraform {
+  backend "gcs" {
+    bucket  = "analyze-this-2026-tfstate"
+    prefix  = "terraform/state"
+  }
   required_version = ">= 1.5.0"
   required_providers {
     google = {

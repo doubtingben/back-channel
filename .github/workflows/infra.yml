@@ -121,6 +121,12 @@ jobs:
               echo "$ip ansible_user=debian" >> infra/terraform/ansible/inventory.ini
             done
           cat infra/terraform/ansible/inventory.ini
+          HOST_COUNT=$(grep -v "^\[" infra/terraform/ansible/inventory.ini | grep -v "^$" | grep -v "localhost" | wc -l)
+          echo "Host count: $HOST_COUNT"
+          if [ "$HOST_COUNT" -eq "0" ]; then
+            echo "Error: No hosts found in inventory."
+            exit 1
+          fi
 
 
       - name: Write SSH key

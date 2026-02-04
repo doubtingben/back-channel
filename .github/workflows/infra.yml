@@ -113,14 +113,17 @@ jobs:
 
       - name: Generate Ansible Inventory
         run: |
+          SERVER_NAME=$(terraform -chdir=infra/terraform output -raw irc_domain)
+          echo "Server Name: $SERVER_NAME"
           echo "[irc]" > infra/terraform/ansible/inventory.ini
           gcloud compute instances list \
             --filter="tags.items=irc-backend AND status:RUNNING" \
             --format="value(networkInterfaces[0].accessConfigs[0].natIP)" \
             | while read ip; do
-              echo "$ip ansible_user=debian" >> infra/terraform/ansible/inventory.ini
+              echo "$SERVER_NAME ansible_host=$ip ansible_user=debian" >> infra/terraform/ansible/inventory.ini
             done
           cat infra/terraform/ansible/inventory.ini
+          ansible-inventory -i infra/terraform/ansible/inventory.ini --list | grep -F "$SERVER_NAME"
 
 
       - name: Write SSH key

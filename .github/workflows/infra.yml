@@ -21,6 +21,7 @@ jobs:
   plan_and_dry_run:
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    environment: analyze-this-2026
     env:
       TF_IN_AUTOMATION: 'true'
       TF_INPUT: 'false'
@@ -68,6 +69,7 @@ jobs:
   apply_and_configure:
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
+    environment: analyze-this-2026
     env:
       TF_IN_AUTOMATION: 'true'
       TF_INPUT: 'false'

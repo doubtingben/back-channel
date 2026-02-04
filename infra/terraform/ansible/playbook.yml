@@ -1,0 +1,81 @@
+---
+- name: Configure IRC server
+  hosts: irc
+  become: true
+  vars:
+    server_name: chat.interestedparticipant.org
+    irc_port_internal: 6667
+    secret_server_password: irc-server-password
+    secret_oper_password: irc-oper-password
+    project_id: ""
+  tasks:
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install prerequisites
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+          - lsb-release
+          - apt-transport-https
+        state: present
+
+    - name: Add Google Cloud CLI repo
+      ansible.builtin.shell: |
+        set -euo pipefail
+        echo "deb [signed-by=/usr/share/keyrings/cloud.google.gpg] http://packages.cloud.google.com/apt cloud-sdk main" > /etc/apt/sources.list.d/google-cloud-sdk.list
+        curl -fsSL https://packages.cloud.google.com/apt/doc/apt-key.gpg | gpg --dearmor -o /usr/share/keyrings/cloud.google.gpg
+      args:
+        creates: /etc/apt/sources.list.d/google-cloud-sdk.list
+
+    - name: Install Google Cloud CLI
+      ansible.builtin.apt:
+        name: google-cloud-cli
+        state: present
+        update_cache: true
+
+    - name: Install ngircd
+      ansible.builtin.apt:
+        name: ngircd
+        state: present
+
+    - name: Set placeholder passwords in check mode
+      ansible.builtin.set_fact:
+        server_password:
+          stdout: "CHECK_MODE_SERVER_PASS"
+        oper_password:
+          stdout: "CHECK_MODE_OPER_PASS"
+      when: ansible_check_mode
+
+    - name: Fetch server password from Secret Manager
+      ansible.builtin.command: gcloud secrets versions access latest --secret={{ secret_server_password }} --project={{ project_id }}
+      register: server_password
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Fetch oper password from Secret Manager
+      ansible.builtin.command: gcloud secrets versions access latest --secret={{ secret_oper_password }} --project={{ project_id }}
+      register: oper_password
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Write ngircd.conf
+      ansible.builtin.template:
+        src: templates/ngircd.conf.j2
+        dest: /etc/ngircd/ngircd.conf
+        mode: "0644"
+
+    - name: Write MOTD
+      ansible.builtin.template:
+        src: templates/motd.j2
+        dest: /etc/ngircd/motd
+        mode: "0644"
+
+    - name: Enable and restart ngircd
+      ansible.builtin.systemd:
+        name: ngircd
+        enabled: true
+        state: restarted

@@ -1,0 +1,7 @@
+[irc]
+%{ for host in hosts ~}
+irc-${host} ansible_host=${host} ansible_user=${user}
+%{ endfor ~}
+
+[all:vars]
+ansible_ssh_common_args=-o StrictHostKeyChecking=accept-new

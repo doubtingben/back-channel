@@ -1,0 +1,20 @@
+[Global]
+Name = {{ server_name }}
+Info = Interested Participant IRC
+Password = {{ server_password.stdout }}
+Listen = 0.0.0.0
+Ports = {{ irc_port_internal }}
+MotdFile = /etc/ngircd/motd
+DNS = no
+
+[Limits]
+MaxConnections = 200
+MaxConnectionsIP = 20
+
+[Operator]
+Name = admin
+Password = {{ oper_password.stdout }}
+
+[Channel]
+Name = #public
+Topic = Welcome to #public

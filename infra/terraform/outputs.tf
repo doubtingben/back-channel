@@ -1,6 +1,6 @@
 output "irc_ip" {
-  value       = google_compute_global_address.irc.address
-  description = "Static IP for the IRC load balancer."
+  value       = google_compute_address.irc_ip.address
+  description = "Static IP for the IRC server."
 }
 
 output "irc_domain" {

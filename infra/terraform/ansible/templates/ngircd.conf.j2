@@ -4,12 +4,17 @@ Info = Interested Participant IRC
 Password = "{{ server_password.stdout }}"
 Listen = 0.0.0.0
 Ports = {{ irc_port_internal }}
-SSLPorts = 6697
-SSLCertFile = /etc/letsencrypt/live/{{ server_name }}/fullchain.pem
-SSLKeyFile = /etc/letsencrypt/live/{{ server_name }}/privkey.pem
 MotdFile = /etc/ngircd/motd
+
+[Options]
 DNS = no
 Ident = no
+PAM = no
+
+[SSL]
+Ports = 6697
+CertFile = /etc/ngircd/ssl/server.crt
+KeyFile = /etc/ngircd/ssl/server.key
 
 [Limits]
 MaxConnections = 200

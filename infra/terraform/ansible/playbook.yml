@@ -57,6 +57,36 @@
       changed_when: "'Certificate not yet due for renewal' not in certbot_result.stdout"
       ignore_errors: true # In case DNS is not propagated yet, allows playbook to continue (SSL will fail but user can re-run)
 
+    - name: Create ngircd SSL directory
+      ansible.builtin.file:
+        path: /etc/ngircd/ssl
+        state: directory
+        owner: irc
+        group: irc
+        mode: "0750"
+
+    - name: Copy SSL certificate
+      ansible.builtin.copy:
+        src: /etc/letsencrypt/live/{{ server_name }}/fullchain.pem
+        dest: /etc/ngircd/ssl/server.crt
+        remote_src: true
+        owner: irc
+        group: irc
+        mode: "0644"
+      notify: Restart ngircd
+      ignore_errors: true
+
+    - name: Copy SSL key
+      ansible.builtin.copy:
+        src: /etc/letsencrypt/live/{{ server_name }}/privkey.pem
+        dest: /etc/ngircd/ssl/server.key
+        remote_src: true
+        owner: irc
+        group: irc
+        mode: "0600"
+      notify: Restart ngircd
+      ignore_errors: true
+
     - name: Download Ops Agent repo script
       ansible.builtin.get_url:
         url: https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh

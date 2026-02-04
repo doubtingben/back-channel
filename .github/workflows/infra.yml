@@ -117,7 +117,7 @@ jobs:
           echo "Server Name: $SERVER_NAME"
           echo "[irc]" > infra/terraform/ansible/inventory.ini
           gcloud compute instances list \
-            --filter="tags.items=irc-backend AND status:RUNNING" \
+            --filter="tags.items=irc-server AND status:RUNNING" \
             --format="value(networkInterfaces[0].accessConfigs[0].natIP)" \
             | while read ip; do
               echo "$SERVER_NAME ansible_host=$ip ansible_user=debian" >> infra/terraform/ansible/inventory.ini

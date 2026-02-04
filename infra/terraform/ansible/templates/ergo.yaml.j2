@@ -1,0 +1,51 @@
+network:
+  name: "InterestedParticipant"
+
+server:
+  name: "{{ server_name }}"
+  listeners:
+    ":6667": {}
+    ":6697":
+      tls:
+        cert: /etc/ergo/ssl/server.crt
+        key: /etc/ergo/ssl/server.key
+
+  password: "{{ server_password.stdout }}"
+
+  cipher-suites: [TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256, TLS_AES_128_GCM_SHA256]
+
+  # Database for history and accounts
+  database:
+    type: sqlite3
+    path: /var/lib/ergo/ircd.db
+
+  # Log to stdout so systemd can capture it
+  logging:
+    - method: stderr
+      level: info
+
+accounts:
+  authentication-enabled: true
+  registration:
+    enabled: true
+    allow-before-connect: true
+
+  # Compatibility with older clients
+  login-via-pass-command: true
+
+channels:
+  default-modes: "+nt"
+
+oper:
+  name: admin
+  password: "{{ oper_password.stdout }}"
+  flags: [oper, global_kill, global_kline, global_zline, roleplay, history, vhost, dline]
+
+# Built-in services (NickServ, etc)
+datastore:
+  path: /var/lib/ergo/ircd.db
+
+history:
+  enabled: true
+  channel-length: 2048
+  client-length: 256

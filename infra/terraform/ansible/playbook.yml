@@ -43,48 +43,77 @@
         state: present
         update_cache: true
 
-    - name: Install ngircd and certbot
+    - name: Install certbot
       ansible.builtin.apt:
-        name:
-          - ngircd
-          - certbot
+        name: certbot
         state: present
+
+    - name: Stop and disable ngircd
+      ansible.builtin.systemd:
+        name: ngircd
+        state: stopped
+        enabled: no
+      ignore_errors: true
+
+    - name: Create ergo user
+      ansible.builtin.user:
+        name: ergo
+        system: true
+        shell: /usr/sbin/nologin
+
+    - name: Download Ergo archive
+      ansible.builtin.unarchive:
+        src: https://github.com/ergochat/ergo/releases/download/v2.17.0/ergo-2.17.0-linux-x86_64.tar.gz
+        dest: /tmp
+        remote_src: yes
+        creates: /tmp/ergo-2.17.0-linux-x86_64/ergo
+
+    - name: Install Ergo binary
+      ansible.builtin.copy:
+        src: /tmp/ergo-2.17.0-linux-x86_64/ergo
+        dest: /usr/local/bin/ergo
+        mode: "0755"
+        remote_src: true
+
+    - name: Create Ergo directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: ergo
+        group: ergo
+        mode: "0750"
+      loop:
+        - /etc/ergo
+        - /var/lib/ergo
+        - /etc/ergo/ssl
 
     - name: Obtain SSL certificate
       ansible.builtin.command:
         cmd: certbot certonly --standalone -d {{ server_name }} --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring
       register: certbot_result
       changed_when: "'Certificate not yet due for renewal' not in certbot_result.stdout"
-      ignore_errors: true # In case DNS is not propagated yet, allows playbook to continue (SSL will fail but user can re-run)
-
-    - name: Create ngircd SSL directory
-      ansible.builtin.file:
-        path: /etc/ngircd/ssl
-        state: directory
-        owner: irc
-        group: irc
-        mode: "0750"
-
-    - name: Copy SSL certificate
-      ansible.builtin.copy:
-        src: /etc/letsencrypt/live/{{ server_name }}/fullchain.pem
-        dest: /etc/ngircd/ssl/server.crt
-        remote_src: true
-        owner: irc
-        group: irc
-        mode: "0644"
-      notify: Restart ngircd
       ignore_errors: true
 
-    - name: Copy SSL key
+    - name: Copy SSL certificate for Ergo
+      ansible.builtin.copy:
+        src: /etc/letsencrypt/live/{{ server_name }}/fullchain.pem
+        dest: /etc/ergo/ssl/server.crt
+        remote_src: true
+        owner: ergo
+        group: ergo
+        mode: "0644"
+      notify: Restart ergo
+      ignore_errors: true
+
+    - name: Copy SSL key for Ergo
       ansible.builtin.copy:
         src: /etc/letsencrypt/live/{{ server_name }}/privkey.pem
-        dest: /etc/ngircd/ssl/server.key
+        dest: /etc/ergo/ssl/server.key
         remote_src: true
-        owner: irc
-        group: irc
+        owner: ergo
+        group: ergo
         mode: "0600"
-      notify: Restart ngircd
+      notify: Restart ergo
       ignore_errors: true
 
     - name: Download Ops Agent repo script
@@ -130,27 +159,42 @@
       changed_when: false
       when: not ansible_check_mode
 
-    - name: Write ngircd.conf
+    - name: Write Ergo config
       ansible.builtin.template:
-        src: templates/ngircd.conf.j2
-        dest: /etc/ngircd/ngircd.conf
-        mode: "0644"
+        src: templates/ergo.yaml.j2
+        dest: /etc/ergo/ircd.yaml
+        owner: ergo
+        group: ergo
+        mode: "0640"
+      notify: Restart ergo
 
-    - name: Write MOTD
-      ansible.builtin.template:
-        src: templates/motd.j2
-        dest: /etc/ngircd/motd
-        mode: "0644"
+    - name: Write Ergo systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ergo.service
+        content: |
+          [Unit]
+          Description=Ergo IRC Server
+          After=network.target
 
-    - name: Enable and restart ngircd
+          [Service]
+          Type=simple
+          User=ergo
+          ExecStart=/usr/local/bin/ergo run --conf /etc/ergo/ircd.yaml
+          Restart=always
+          LimitNOFILE=1048576
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart ergo
+
+    - name: Enable and restart Ergo
       ansible.builtin.systemd:
-        name: ngircd
+        name: ergo
         enabled: true
-        state: restarted
-
+        state: started
 
   handlers:
-    - name: Restart ngircd
+    - name: Restart ergo
       ansible.builtin.systemd:
-        name: ngircd
+        name: ergo
         state: restarted

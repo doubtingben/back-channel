@@ -112,90 +112,29 @@ resource "google_secret_manager_secret_version" "irc_oper_password" {
   secret_data = var.irc_oper_password != "" ? var.irc_oper_password : random_password.oper_password.result
 }
 
-resource "google_compute_global_address" "irc" {
-  name = "irc-ip"
+resource "google_compute_address" "irc_ip" {
+  name   = "irc-ip"
+  region = var.region
 }
 
-resource "google_compute_health_check" "irc" {
-  name                = "irc-health"
-  check_interval_sec  = 5
-  timeout_sec         = 5
-  healthy_threshold   = 2
-  unhealthy_threshold = 2
-
-  tcp_health_check {
-    port = var.irc_port_internal
-  }
-}
-
-resource "google_compute_backend_service" "irc" {
-  name                  = "irc-backend"
-  protocol              = "TCP"
-  load_balancing_scheme = "EXTERNAL"
-  timeout_sec           = 3600
-  port_name             = "irc"
-  health_checks         = [google_compute_health_check.irc.id]
-
-  backend {
-    group = google_compute_region_instance_group_manager.irc.instance_group
-  }
-}
-
-resource "google_compute_managed_ssl_certificate" "irc" {
-  name = "irc-managed-cert"
-  managed {
-    domains = [var.domain]
-  }
-}
-
-resource "google_compute_target_ssl_proxy" "irc" {
-  name             = "irc-ssl-proxy"
-  backend_service  = google_compute_backend_service.irc.id
-  ssl_certificates = [google_compute_managed_ssl_certificate.irc.id]
-}
-
-resource "google_compute_global_forwarding_rule" "irc" {
-  name                  = "irc-forwarding"
-  ip_address            = google_compute_global_address.irc.address
-  port_range            = var.irc_port_external
-  target                = google_compute_target_ssl_proxy.irc.id
-  load_balancing_scheme = "EXTERNAL"
-  ip_protocol           = "TCP"
-}
-
-resource "google_compute_firewall" "irc_backend" {
-  name    = "irc-backend-allow-proxy"
-  network = var.network
-
-  allow {
-    protocol = "tcp"
-    ports    = [var.irc_port_internal]
-  }
-
-  source_ranges = [
-    "35.191.0.0/16",
-    "130.211.0.0/22"
-  ]
-
-  target_tags = ["irc-backend"]
-}
-
-resource "google_compute_region_instance_template" "irc" {
-  name_prefix  = "irc-template-"
-  region       = var.region
+resource "google_compute_instance" "irc_server" {
+  name         = "irc-server"
   machine_type = var.machine_type
-  tags         = ["irc-backend"]
+  zone         = "${var.region}-a"
+  tags         = ["irc-server"]
 
-  disk {
-    boot         = true
-    auto_delete  = true
-    source_image = var.source_image
+  boot_disk {
+    initialize_params {
+      image = var.source_image
+    }
   }
 
   network_interface {
     network    = var.network
     subnetwork = var.subnetwork != "" ? var.subnetwork : null
-    access_config {}
+    access_config {
+      nat_ip = google_compute_address.irc_ip.address
+    }
   }
 
   service_account {
@@ -217,20 +156,17 @@ resource "google_compute_region_instance_template" "irc" {
   ]
 }
 
-resource "google_compute_region_instance_group_manager" "irc" {
-  name               = "irc-mig"
-  region             = var.region
-  base_instance_name = "irc"
-  target_size        = 1
+resource "google_compute_firewall" "irc_public" {
+  name    = "irc-public-allow"
+  network = var.network
 
-  version {
-    instance_template = google_compute_region_instance_template.irc.id
+  allow {
+    protocol = "tcp"
+    ports    = ["6667", "6697", "80"]
   }
 
-  named_port {
-    name = "irc"
-    port = var.irc_port_internal
-  }
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["irc-server"]
 }
 
 resource "google_compute_firewall" "irc_ssh" {
@@ -243,17 +179,15 @@ resource "google_compute_firewall" "irc_ssh" {
   }
 
   source_ranges = var.ssh_source_ranges
-  target_tags   = ["irc-backend"]
+  target_tags   = ["irc-server"]
 }
-
-
 
 resource "cloudflare_dns_record" "irc" {
   count   = var.cloudflare_manage_dns ? 1 : 0
   zone_id = var.cloudflare_zone_id
   name    = var.domain
   type    = "A"
-  content = google_compute_global_address.irc.address
+  content = google_compute_address.irc_ip.address
   proxied = false
   ttl     = 300
 }

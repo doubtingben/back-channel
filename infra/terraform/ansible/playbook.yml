@@ -43,10 +43,19 @@
         state: present
         update_cache: true
 
-    - name: Install ngircd
+    - name: Install ngircd and certbot
       ansible.builtin.apt:
-        name: ngircd
+        name:
+          - ngircd
+          - certbot
         state: present
+
+    - name: Obtain SSL certificate
+      ansible.builtin.command:
+        cmd: certbot certonly --standalone -d {{ server_name }} --non-interactive --agree-tos --register-unsafely-without-email --keep-until-expiring
+      register: certbot_result
+      changed_when: "'Certificate not yet due for renewal' not in certbot_result.stdout"
+      ignore_errors: true # In case DNS is not propagated yet, allows playbook to continue (SSL will fail but user can re-run)
 
     - name: Download Ops Agent repo script
       ansible.builtin.get_url:
@@ -107,4 +116,11 @@
       ansible.builtin.systemd:
         name: ngircd
         enabled: true
+        state: restarted
+
+
+  handlers:
+    - name: Restart ngircd
+      ansible.builtin.systemd:
+        name: ngircd
         state: restarted

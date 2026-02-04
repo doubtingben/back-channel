@@ -49,6 +49,8 @@ ansible-playbook playbook.yml \
   -e irc_port_internal=6667
 ```
 
+The playbook installs the Google Cloud Ops Agent to ship system logs to Cloud Logging.
+
 ## Outputs
 - `irc_ip`: the global external IP to use in DNS.
 - `irc_external_port`: the TLS port exposed by the load balancer.

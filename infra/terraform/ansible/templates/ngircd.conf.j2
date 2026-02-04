@@ -1,11 +1,12 @@
 [Global]
 Name = {{ server_name }}
 Info = Interested Participant IRC
-Password = {{ server_password.stdout }}
+Password = "{{ server_password.stdout }}"
 Listen = 0.0.0.0
 Ports = {{ irc_port_internal }}
 MotdFile = /etc/ngircd/motd
 DNS = no
+Ident = no
 
 [Limits]
 MaxConnections = 200

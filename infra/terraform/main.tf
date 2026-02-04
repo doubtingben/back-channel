@@ -43,6 +43,16 @@ resource "google_project_service" "secretmanager" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "logging" {
+  service            = "logging.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_project_service" "monitoring" {
+  service            = "monitoring.googleapis.com"
+  disable_on_destroy = false
+}
+
 resource "google_service_account" "irc" {
   account_id   = "irc-server"
   display_name = "IRC server service account"
@@ -51,6 +61,18 @@ resource "google_service_account" "irc" {
 resource "google_project_iam_member" "secret_accessor" {
   project = var.project_id
   role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.irc.email}"
+}
+
+resource "google_project_iam_member" "logging_writer" {
+  project = var.project_id
+  role    = "roles/logging.logWriter"
+  member  = "serviceAccount:${google_service_account.irc.email}"
+}
+
+resource "google_project_iam_member" "monitoring_writer" {
+  project = var.project_id
+  role    = "roles/monitoring.metricWriter"
   member  = "serviceAccount:${google_service_account.irc.email}"
 }
 
@@ -110,7 +132,7 @@ resource "google_compute_backend_service" "irc" {
   name                  = "irc-backend"
   protocol              = "TCP"
   load_balancing_scheme = "EXTERNAL"
-  timeout_sec           = 10
+  timeout_sec           = 3600
   port_name             = "irc"
   health_checks         = [google_compute_health_check.irc.id]
 
@@ -187,7 +209,11 @@ resource "google_compute_region_instance_template" "irc" {
 
   depends_on = [
     google_project_service.compute,
-    google_project_iam_member.secret_accessor
+    google_project_service.logging,
+    google_project_service.monitoring,
+    google_project_iam_member.secret_accessor,
+    google_project_iam_member.logging_writer,
+    google_project_iam_member.monitoring_writer
   ]
 }
 

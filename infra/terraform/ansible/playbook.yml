@@ -48,6 +48,29 @@
         name: ngircd
         state: present
 
+    - name: Download Ops Agent repo script
+      ansible.builtin.get_url:
+        url: https://dl.google.com/cloudagents/add-google-cloud-ops-agent-repo.sh
+        dest: /tmp/add-google-cloud-ops-agent-repo.sh
+        mode: "0755"
+
+    - name: Add Ops Agent repo
+      ansible.builtin.command: /tmp/add-google-cloud-ops-agent-repo.sh
+      args:
+        creates: /etc/apt/sources.list.d/google-cloud-ops-agent.list
+
+    - name: Install Ops Agent
+      ansible.builtin.apt:
+        name: google-cloud-ops-agent
+        state: present
+        update_cache: true
+
+    - name: Enable Ops Agent
+      ansible.builtin.systemd:
+        name: google-cloud-ops-agent
+        enabled: true
+        state: started
+
     - name: Set placeholder passwords in check mode
       ansible.builtin.set_fact:
         server_password:

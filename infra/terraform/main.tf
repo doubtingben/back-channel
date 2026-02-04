@@ -45,8 +45,9 @@ resource "google_service_account" "irc" {
 }
 
 resource "google_project_iam_member" "secret_accessor" {
-  role   = "roles/secretmanager.secretAccessor"
-  member = "serviceAccount:${google_service_account.irc.email}"
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.irc.email}"
 }
 
 resource "random_password" "server_password" {
@@ -90,10 +91,10 @@ resource "google_compute_global_address" "irc" {
 }
 
 resource "google_compute_health_check" "irc" {
-  name               = "irc-health"
-  check_interval_sec = 5
-  timeout_sec        = 5
-  healthy_threshold  = 2
+  name                = "irc-health"
+  check_interval_sec  = 5
+  timeout_sec         = 5
+  healthy_threshold   = 2
   unhealthy_threshold = 2
 
   tcp_health_check {
@@ -241,12 +242,12 @@ resource "local_file" "ansible_inventory" {
   })
 }
 
-resource "cloudflare_record" "irc" {
+resource "cloudflare_dns_record" "irc" {
   count   = var.cloudflare_manage_dns ? 1 : 0
   zone_id = var.cloudflare_zone_id
   name    = var.domain
   type    = "A"
-  value   = google_compute_global_address.irc.address
+  content = google_compute_global_address.irc.address
   proxied = false
   ttl     = 300
 }

@@ -191,3 +191,98 @@ resource "cloudflare_dns_record" "irc" {
   proxied = false
   ttl     = 300
 }
+
+resource "google_project_service" "run" {
+  service            = "run.googleapis.com"
+  disable_on_destroy = false
+}
+
+resource "google_service_account" "irccat" {
+  account_id   = "irccat"
+  display_name = "IRCCat service account"
+}
+
+resource "google_project_iam_member" "irccat_secret_accessor" {
+  project = var.project_id
+  role    = "roles/secretmanager.secretAccessor"
+  member  = "serviceAccount:${google_service_account.irccat.email}"
+}
+
+resource "google_cloud_run_service" "irccat" {
+  name     = "irccat"
+  location = var.region
+
+  template {
+    spec {
+      service_account_name = google_service_account.irccat.email
+      containers {
+        image = "gcr.io/${var.project_id}/irccat:latest"
+        
+        env {
+          name  = "IRC_SERVER"
+          value = "${var.domain}:6697"
+        }
+        
+        env {
+          name  = "IRC_CHANNELS"
+          value = "[\"#analyze-this\"]"
+        }
+
+        env {
+            name = "IRC_NICK"
+            value = "irccat"
+        }
+
+        env {
+          name = "IRC_PASSWORD"
+          value_from {
+            secret_key_ref {
+              name = google_secret_manager_secret.irc_server_password.secret_id
+              key  = "latest"
+            }
+          }
+        }
+      }
+    }
+  }
+
+  traffic {
+    percent         = 100
+    latest_revision = true
+  }
+
+  depends_on = [
+    google_project_service.run,
+    google_project_iam_member.irccat_secret_accessor
+  ]
+}
+
+resource "google_cloud_run_domain_mapping" "irccat" {
+  location = var.region
+  name     = "chat-relay.interestedparticipants.org"
+
+  metadata {
+    namespace = var.project_id
+  }
+
+  spec {
+    route_name = google_cloud_run_service.irccat.name
+  }
+}
+
+resource "google_cloud_run_service_iam_member" "public" {
+  service  = google_cloud_run_service.irccat.name
+  location = google_cloud_run_service.irccat.location
+  role     = "roles/run.invoker"
+  member   = "allUsers"
+}
+
+resource "cloudflare_dns_record" "irccat" {
+  count   = var.cloudflare_manage_dns ? 1 : 0
+  zone_id = var.cloudflare_zone_id
+  name    = "chat-relay"
+  type    = "CNAME"
+  content = "ghs.googlehosted.com"
+  proxied = false
+  ttl     = 300
+}

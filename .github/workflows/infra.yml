@@ -94,6 +94,15 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
 
+      - name: Configure Docker
+        run: gcloud auth configure-docker
+
+      - name: Build and Push IRCCat
+        run: |
+          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/irccat:latest infra/docker/irccat
+          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/irccat:latest
+
+
       - name: Install Ansible
         run: python -m pip install --upgrade pip ansible
 

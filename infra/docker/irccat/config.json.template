@@ -1,0 +1,20 @@
+{
+  "http": {
+    "listen": ":$PORT",
+    "tls": false,
+    "listeners": {
+      "generic": {
+        "secret": "$IRC_PASSWORD",
+        "strict": true
+      }
+    }
+  },
+  "irc": {
+    "server": "$IRC_SERVER",
+    "tls": true,
+    "nick": "$IRC_NICK",
+    "realname": "IRCCat",
+    "server_pass": "$IRC_PASSWORD",
+    "channels": $IRC_CHANNELS_JSON
+  }
+}

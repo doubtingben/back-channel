@@ -162,7 +162,7 @@ resource "google_compute_firewall" "irc_public" {
 
   allow {
     protocol = "tcp"
-    ports    = ["6667", "6697", "80"]
+    ports    = ["6667", "6697", "80", "443"]
   }
 
   source_ranges = ["0.0.0.0/0"]

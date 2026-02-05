@@ -1,0 +1,22 @@
+{
+  "http": {
+    "listen": ":443",
+    "tls": true,
+    "tls_key": "/etc/irccat/ssl/server.key",
+    "tls_cert": "/etc/irccat/ssl/server.crt",
+    "listeners": {
+      "generic": {
+        "secret": "{{ server_password.stdout }}",
+        "strict": true
+      }
+    }
+  },
+  "irc": {
+    "server": "{{ server_name }}:6697",
+    "tls": true,
+    "nick": "irccat",
+    "realname": "IRCCat",
+    "server_pass": "{{ server_password.stdout }}",
+    "channels": ["#analyze-this"]
+  }
+}

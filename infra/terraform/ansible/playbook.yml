@@ -21,6 +21,8 @@
           - gnupg
           - lsb-release
           - apt-transport-https
+          - golang-go
+          - git
         state: present
 
     - name: Download and dearmor Google Cloud SDK GPG key
@@ -207,8 +209,104 @@
         enabled: true
         state: started
 
+    - name: Create irccat user
+      ansible.builtin.user:
+        name: irccat
+        system: true
+        shell: /usr/sbin/nologin
+
+    - name: Clone irccat repository
+      ansible.builtin.git:
+        repo: https://github.com/irccloud/irccat.git
+        dest: /tmp/irccat-src
+        version: master
+        force: yes
+
+    - name: Build irccat
+      ansible.builtin.command:
+        cmd: go build -o irccat
+        chdir: /tmp/irccat-src
+      changed_when: true
+
+    - name: Install irccat binary
+      ansible.builtin.copy:
+        src: /tmp/irccat-src/irccat
+        dest: /usr/local/bin/irccat
+        mode: "0755"
+        remote_src: true
+
+    - name: Create irccat config directory
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: irccat
+        group: irccat
+        mode: "0750"
+      loop:
+        - /etc/irccat
+        - /etc/irccat/ssl
+
+    - name: Copy SSL certificate for irccat
+      ansible.builtin.copy:
+        src: /etc/letsencrypt/live/{{ server_name }}/fullchain.pem
+        dest: /etc/irccat/ssl/server.crt
+        remote_src: true
+        owner: irccat
+        group: irccat
+        mode: "0644"
+      notify: Restart irccat
+
+    - name: Copy SSL key for irccat
+      ansible.builtin.copy:
+        src: /etc/letsencrypt/live/{{ server_name }}/privkey.pem
+        dest: /etc/irccat/ssl/server.key
+        remote_src: true
+        owner: irccat
+        group: irccat
+        mode: "0600"
+      notify: Restart irccat
+
+    - name: Write irccat config
+      ansible.builtin.template:
+        src: templates/irccat.json.j2
+        dest: /etc/irccat/irccat.json
+        owner: irccat
+        group: irccat
+        mode: "0640"
+      notify: Restart irccat
+
+    - name: Write irccat systemd unit
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/irccat.service
+        content: |
+          [Unit]
+          Description=IRCCat
+          After=network.target ergo.service
+
+          [Service]
+          Type=simple
+          User=irccat
+          AmbientCapabilities=CAP_NET_BIND_SERVICE
+          ExecStart=/usr/local/bin/irccat -c /etc/irccat/irccat.json
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart irccat
+
+    - name: Enable and restart irccat
+      ansible.builtin.systemd:
+        name: irccat
+        enabled: true
+        state: started
+
   handlers:
     - name: Restart ergo
       ansible.builtin.systemd:
         name: ergo
+        state: restarted
+
+    - name: Restart irccat
+      ansible.builtin.systemd:
+        name: irccat
         state: restarted

@@ -53,6 +53,11 @@ resource "google_project_service" "monitoring" {
   disable_on_destroy = false
 }
 
+resource "google_project_service" "artifactregistry" {
+  service            = "artifactregistry.googleapis.com"
+  disable_on_destroy = false
+}
+
 resource "google_service_account" "irc" {
   account_id   = "irc-server"
   display_name = "IRC server service account"
@@ -285,4 +290,10 @@ resource "cloudflare_dns_record" "irccat" {
   content = "ghs.googlehosted.com"
   proxied = false
   ttl     = 300
+}
+
+resource "google_project_iam_member" "cicd_artifact_registry_writer" {
+  project = var.project_id
+  role    = "roles/artifactregistry.writer"
+  member  = "serviceAccount:irc-cicd@${var.project_id}.iam.gserviceaccount.com"
 }

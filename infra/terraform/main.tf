@@ -294,6 +294,6 @@ resource "cloudflare_dns_record" "irccat" {
 
 resource "google_project_iam_member" "cicd_artifact_registry_writer" {
   project = var.project_id
-  role    = "roles/artifactregistry.writer"
+  role    = "roles/artifactregistry.admin"
   member  = "serviceAccount:irc-cicd@${var.project_id}.iam.gserviceaccount.com"
 }

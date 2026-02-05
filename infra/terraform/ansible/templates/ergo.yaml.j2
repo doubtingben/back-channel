@@ -33,6 +33,30 @@ accounts:
   # Compatibility with older clients
   login-via-pass-command: true
 
+limits:
+  nicklen: 32
+  identlen: 20
+  realnamelen: 150
+  channellen: 64
+  awaylen: 390
+  kicklen: 390
+  topiclen: 390
+  monitor-entries: 100
+  whowas-entries: 100
+  chan-list-modes: 100
+  registration-messages: 1024
+  multiline:
+    max-bytes: 4096
+    max-lines: 100
+
+fakelag:
+  enabled: true
+  window: 1s
+  burst-limit: 15
+  messages-per-window: 4
+  cooldown: 2s
+
+
 channels:
   default-modes: "+nt"
 

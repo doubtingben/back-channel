@@ -202,6 +202,15 @@ resource "google_project_service" "run" {
   disable_on_destroy = false
 }
 
+resource "google_artifact_registry_repository" "irccat" {
+  location      = var.region
+  repository_id = "irccat"
+  description   = "Docker images for irccat"
+  format        = "DOCKER"
+
+  depends_on = [google_project_service.artifactregistry]
+}
+
 resource "google_service_account" "irccat" {
   account_id   = "irccat"
   display_name = "IRCCat service account"
@@ -221,7 +230,7 @@ resource "google_cloud_run_service" "irccat" {
     spec {
       service_account_name = google_service_account.irccat.email
       containers {
-        image = "gcr.io/${var.project_id}/irccat:latest"
+        image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.irccat.repository_id}/irccat:latest"
         
         env {
           name  = "IRC_SERVER"
@@ -296,4 +305,22 @@ resource "google_project_iam_member" "cicd_artifact_registry_writer" {
   project = var.project_id
   role    = "roles/artifactregistry.admin"
   member  = "serviceAccount:irc-cicd@${var.project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "cicd_gcr_writer" {
+  project = var.project_id
+  role    = "roles/storage.objectAdmin"
+  member  = "serviceAccount:irc-cicd@${var.project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_project_iam_member" "cicd_run_admin" {
+  project = var.project_id
+  role    = "roles/run.admin"
+  member  = "serviceAccount:irc-cicd@${var.project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_service_account_iam_member" "cicd_impersonate_irccat_runner" {
+  service_account_id = google_service_account.irc.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:irc-cicd@${var.project_id}.iam.gserviceaccount.com"
 }

@@ -1,0 +1,46 @@
+# Cloud Build pipeline for irccat -> Cloud Run
+# Uses irc-cicd SA for build/deploy and runs the service as irc-server SA.
+
+substitutions:
+  _REGION: us-central1
+  _SERVICE: irccat
+  _REPO: irccat
+  _IMAGE: ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPO}/irccat:latest
+
+serviceAccount: projects/$PROJECT_ID/serviceAccounts/irc-cicd@$PROJECT_ID.iam.gserviceaccount.com
+
+steps:
+  - id: Build irccat image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -t
+      - ${_IMAGE}
+      - infra/docker/irccat
+
+  - id: Push irccat image
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - ${_IMAGE}
+
+  - id: Deploy to Cloud Run
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image
+      - ${_IMAGE}
+      - --region
+      - ${_REGION}
+      - --platform
+      - managed
+      - --service-account
+      - irc-server@${PROJECT_ID}.iam.gserviceaccount.com
+      - --allow-unauthenticated
+      - --quiet
+
+images:
+  - ${_IMAGE}

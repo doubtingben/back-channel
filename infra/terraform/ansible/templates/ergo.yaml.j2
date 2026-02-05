@@ -10,7 +10,7 @@ server:
         cert: /etc/ergo/ssl/server.crt
         key: /etc/ergo/ssl/server.key
 
-  password: "{{ server_password.stdout }}"
+  password: "{{ server_password_hash.stdout }}"
 
   cipher-suites: [TLS_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384, TLS_ECDHE_ECDSA_WITH_CHACHA20_POLY1305, TLS_ECDHE_RSA_WITH_CHACHA20_POLY1305, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256, TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256, TLS_AES_128_GCM_SHA256]
 
@@ -62,7 +62,7 @@ channels:
 
 oper:
   name: admin
-  password: "{{ oper_password.stdout }}"
+  password: "{{ oper_password_hash.stdout }}"
   flags: [oper, global_kill, global_kline, global_zline, roleplay, history, vhost, dline]
 
 # Built-in services (NickServ, etc)

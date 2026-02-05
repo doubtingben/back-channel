@@ -159,6 +159,20 @@
       changed_when: false
       when: not ansible_check_mode
 
+    - name: Generate server password hash
+      ansible.builtin.shell: |
+        echo "{{ server_password.stdout }}" | /usr/local/bin/ergo genpasswd
+      register: server_password_hash
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Generate oper password hash
+      ansible.builtin.shell: |
+        echo "{{ oper_password.stdout }}" | /usr/local/bin/ergo genpasswd
+      register: oper_password_hash
+      changed_when: false
+      when: not ansible_check_mode
+
     - name: Write Ergo config
       ansible.builtin.template:
         src: templates/ergo.yaml.j2

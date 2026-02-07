@@ -94,6 +94,24 @@ jobs:
         uses: google-github-actions/setup-gcloud@v2
 
 
+      - name: Install Ansible
+        run: python -m pip install --upgrade pip ansible
+
+      - name: Terraform Init
+        working-directory: infra/terraform
+        run: terraform init
+
+      - name: Setup Artifact Registry
+        working-directory: infra/terraform
+        run: |
+          terraform apply -auto-approve \
+            -target=google_artifact_registry_repository.irccat \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var="cloudflare_api_token=${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+            -var="cloudflare_zone_id=${{ secrets.CLOUDFLARE_ZONE_ID }}" \
+            -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" \
+            -var="ssh_source_ranges=[\"${{ secrets.SSH_SOURCE_CIDR }}\"]"
+
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
@@ -101,14 +119,6 @@ jobs:
         run: |
           docker build -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/irccat/irccat:latest infra/docker/irccat
           docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/irccat/irccat:latest
-
-
-      - name: Install Ansible
-        run: python -m pip install --upgrade pip ansible
-
-      - name: Terraform Init
-        working-directory: infra/terraform
-        run: terraform init
 
       - name: Terraform Apply
         working-directory: infra/terraform

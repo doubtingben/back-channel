@@ -95,12 +95,12 @@ jobs:
 
 
       - name: Configure Docker
-        run: gcloud auth configure-docker
+        run: gcloud auth configure-docker us-central1-docker.pkg.dev
 
       - name: Build and Push IRCCat
         run: |
-          docker build -t gcr.io/${{ secrets.GCP_PROJECT_ID }}/irccat:latest infra/docker/irccat
-          docker push gcr.io/${{ secrets.GCP_PROJECT_ID }}/irccat:latest
+          docker build -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/irccat/irccat:latest infra/docker/irccat
+          docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/irccat/irccat:latest
 
 
       - name: Install Ansible

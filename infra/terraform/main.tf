@@ -83,12 +83,12 @@ resource "google_project_iam_member" "monitoring_writer" {
 
 resource "random_password" "server_password" {
   length  = 28
-  special = true
+  special = false
 }
 
 resource "random_password" "oper_password" {
   length  = 28
-  special = true
+  special = false
 }
 
 resource "google_secret_manager_secret" "irc_server_password" {

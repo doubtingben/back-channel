@@ -1,6 +1,7 @@
 variable "project_id" {
   type        = string
   description = "GCP project id."
+  default     = "analyze-this-2026"
 }
 
 variable "region" {
@@ -89,12 +90,7 @@ variable "ssh_source_ranges" {
   default     = ["0.0.0.0/0"]
 }
 
-variable "cloudflare_api_token" {
-  type        = string
-  description = "Cloudflare API token with DNS edit permissions."
-  default     = ""
-  sensitive   = true
-}
+
 
 variable "cloudflare_zone_id" {
   type        = string

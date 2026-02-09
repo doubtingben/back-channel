@@ -29,9 +29,7 @@ provider "google" {
   region  = var.region
 }
 
-provider "cloudflare" {
-  api_token = var.cloudflare_api_token
-}
+provider "cloudflare" {}
 
 resource "google_project_service" "compute" {
   service            = "compute.googleapis.com"

@@ -27,4 +27,4 @@ sed -e "s|\$PORT|$PORT|g" \
 echo "Starting irccat with config:"
 cat /etc/irccat.json | grep -v "password\|secret" 
 
-exec /app/irccat -c /etc/irccat.json
+exec /app/irccat -config /etc/irccat.json

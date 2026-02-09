@@ -197,6 +197,16 @@ resource "cloudflare_dns_record" "irc" {
   ttl     = 300
 }
 
+resource "cloudflare_dns_record" "lounge" {
+  count   = var.cloudflare_manage_dns ? 1 : 0
+  zone_id = var.cloudflare_zone_id
+  name    = "chat-client"
+  type    = "A"
+  content = google_compute_address.irc_ip.address
+  proxied = false
+  ttl     = 300
+}
+
 resource "google_project_service" "run" {
   service            = "run.googleapis.com"
   disable_on_destroy = false

@@ -327,8 +327,14 @@ resource "google_project_iam_member" "cicd_run_admin" {
   member  = "serviceAccount:irc-cicd@${var.project_id}.iam.gserviceaccount.com"
 }
 
-resource "google_service_account_iam_member" "cicd_impersonate_irccat_runner" {
+resource "google_service_account_iam_member" "cicd_impersonate_irc_vm" {
   service_account_id = google_service_account.irc.name
+  role               = "roles/iam.serviceAccountUser"
+  member             = "serviceAccount:irc-cicd@${var.project_id}.iam.gserviceaccount.com"
+}
+
+resource "google_service_account_iam_member" "cicd_impersonate_irccat" {
+  service_account_id = google_service_account.irccat.name
   role               = "roles/iam.serviceAccountUser"
   member             = "serviceAccount:irc-cicd@${var.project_id}.iam.gserviceaccount.com"
 }

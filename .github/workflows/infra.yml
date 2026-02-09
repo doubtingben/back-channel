@@ -51,13 +51,13 @@ jobs:
 
       - name: Terraform Plan
         working-directory: infra/terraform
-        run: |
-          terraform plan \
-            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
-            -var="cloudflare_api_token=${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            -var="cloudflare_zone_id=${{ secrets.CLOUDFLARE_ZONE_ID }}" \
-            -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" \
-            -var="ssh_source_ranges=[\"${{ secrets.SSH_SOURCE_CIDR }}\"]"
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_ssh_source_ranges: '["${{ secrets.SSH_SOURCE_CIDR }}"]'
+        run: terraform plan
 
       - name: Ansible Dry Run
         working-directory: infra/terraform/ansible
@@ -103,14 +103,15 @@ jobs:
 
       - name: Setup Artifact Registry
         working-directory: infra/terraform
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_ssh_source_ranges: '["${{ secrets.SSH_SOURCE_CIDR }}"]'
         run: |
           terraform apply -auto-approve \
-            -target=google_artifact_registry_repository.irccat \
-            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
-            -var="cloudflare_api_token=${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            -var="cloudflare_zone_id=${{ secrets.CLOUDFLARE_ZONE_ID }}" \
-            -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" \
-            -var="ssh_source_ranges=[\"${{ secrets.SSH_SOURCE_CIDR }}\"]"
+            -target=google_artifact_registry_repository.irccat
 
       - name: Configure Docker
         run: gcloud auth configure-docker us-central1-docker.pkg.dev
@@ -122,13 +123,13 @@ jobs:
 
       - name: Terraform Apply
         working-directory: infra/terraform
-        run: |
-          terraform apply -auto-approve \
-            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
-            -var="cloudflare_api_token=${{ secrets.CLOUDFLARE_API_TOKEN }}" \
-            -var="cloudflare_zone_id=${{ secrets.CLOUDFLARE_ZONE_ID }}" \
-            -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" \
-            -var="ssh_source_ranges=[\"${{ secrets.SSH_SOURCE_CIDR }}\"]"
+        env:
+          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
+          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
+          TF_VAR_ssh_source_ranges: '["${{ secrets.SSH_SOURCE_CIDR }}"]'
+        run: terraform apply -auto-approve
 
       - name: Generate Ansible Inventory
         run: |

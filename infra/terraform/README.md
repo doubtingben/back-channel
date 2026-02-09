@@ -9,7 +9,7 @@ Cloud Run only supports HTTP(S)/gRPC traffic; it does not accept raw TCP connect
 - Secret Manager secrets for IRC server/oper passwords.
 
 ## Manual steps required
-1) **Cloudflare DNS**: Provide `cloudflare_api_token` and `cloudflare_zone_id` so Terraform can create the A record. If you want to do DNS manually, set `cloudflare_manage_dns=false` and create the A record for `chat.interestedparticipant.org` pointing to the `irc_ip` output.
+1) **Cloudflare DNS**: Set `CLOUDFLARE_API_TOKEN` environment variable and provide `cloudflare_zone_id` so Terraform can create the A record. If you want to do DNS manually, set `cloudflare_manage_dns=false` and create the A record for `chat.interestedparticipant.org` pointing to the `irc_ip` output.
 2) **Wait for cert**: Google-managed certs only become `ACTIVE` after DNS propagates. This can take minutes to hours.
 3) **Run Ansible**: After Terraform finishes, run the playbook to install/configure ngircd.
 4) **Client connection**: Use TLS on port `443` (default). Example: `ircs://chat.interestedparticipant.org:443` and supply the server password (PASS).
@@ -21,7 +21,7 @@ cd infra/terraform
 terraform init
 terraform apply \
   -var="project_id=YOUR_PROJECT_ID" \
-  -var="cloudflare_api_token=YOUR_CF_TOKEN" \
+
   -var="cloudflare_zone_id=YOUR_CF_ZONE_ID" \
   -var="ssh_public_key=$(cat ~/.ssh/id_rsa.pub)" \
   -var="ssh_source_ranges=[\"YOUR_IP_CIDR/32\"]"

@@ -281,7 +281,7 @@ resource "google_cloud_run_service" "irccat" {
 
 resource "google_cloud_run_domain_mapping" "irccat" {
   location = var.region
-  name     = "chat-relay.interestedparticipants.org"
+  name     = "chat-relay.interestedparticipant.org"
 
   metadata {
     namespace = var.project_id

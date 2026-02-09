@@ -101,25 +101,6 @@ jobs:
         working-directory: infra/terraform
         run: terraform init
 
-      - name: Setup Artifact Registry
-        working-directory: infra/terraform
-        env:
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          TF_VAR_cloudflare_zone_id: ${{ secrets.CLOUDFLARE_ZONE_ID }}
-          TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
-          TF_VAR_ssh_source_ranges: '["${{ secrets.SSH_SOURCE_CIDR }}"]'
-        run: |
-          terraform apply -auto-approve \
-            -target=google_artifact_registry_repository.irccat
-
-      - name: Configure Docker
-        run: gcloud auth configure-docker us-central1-docker.pkg.dev
-
-      - name: Build and Push IRCCat
-        run: |
-          docker build -t us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/irccat/irccat:latest infra/docker/irccat
-          docker push us-central1-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/irccat/irccat:latest
 
       - name: Terraform Apply
         working-directory: infra/terraform

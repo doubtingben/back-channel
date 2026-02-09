@@ -16,7 +16,8 @@
     "tls": true,
     "nick": "irccat",
     "realname": "IRCCat",
-    "server_pass": "{{ server_password.stdout }}",
+    "sasl_user": "irccat",
+    "sasl_pass": "{{ irccat_password.stdout }}",
     "channels": ["#analyze-this"]
   }
 }

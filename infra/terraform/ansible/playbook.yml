@@ -4,10 +4,11 @@
   become: true
   vars:
     server_name: chat.interestedparticipant.org
+    client_server_name: chat-client.interestedparticipant.org
     irc_port_internal: 6667
     secret_server_password: irc-server-password
     secret_oper_password: irc-oper-password
-    project_id: ""
+    project_id: "analyze-this-2026"
   tasks:
     - name: Update apt cache
       ansible.builtin.apt:
@@ -23,6 +24,7 @@
           - apt-transport-https
           - golang-go
           - git
+          - python3-bcrypt
         state: present
 
     - name: Download and dearmor Google Cloud SDK GPG key
@@ -42,6 +44,47 @@
     - name: Install Google Cloud CLI
       ansible.builtin.apt:
         name: google-cloud-cli
+        state: present
+        update_cache: true
+
+    - name: Download Node.js setup script
+      ansible.builtin.get_url:
+        url: https://deb.nodesource.com/setup_20.x
+        dest: /tmp/nodesource_setup.sh
+        mode: '0755'
+
+    - name: Run Node.js setup script
+      ansible.builtin.command: /tmp/nodesource_setup.sh
+
+    - name: Install Node.js
+      ansible.builtin.apt:
+        name: nodejs
+        state: present
+        update_cache: true
+
+    - name: Install Caddy dependencies
+      ansible.builtin.apt:
+        name:
+          - debian-keyring
+          - debian-archive-keyring
+          - apt-transport-https
+        state: present
+
+    - name: Add Caddy GPG key
+      ansible.builtin.get_url:
+        url: https://dl.cloudsmith.io/public/caddy/stable/gpg.key
+        dest: /usr/share/keyrings/caddy-stable-archive-keyring.asc
+        mode: '0644'
+
+    - name: Add Caddy repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/usr/share/keyrings/caddy-stable-archive-keyring.asc] https://dl.cloudsmith.io/public/caddy/stable/deb/debian any-version main"
+        filename: caddy-stable
+        state: present
+
+    - name: Install Caddy
+      ansible.builtin.apt:
+        name: caddy
         state: present
         update_cache: true
 
@@ -88,6 +131,12 @@
         - /etc/ergo
         - /var/lib/ergo
         - /etc/ergo/ssl
+
+    - name: Stop Caddy to release port 80
+      ansible.builtin.systemd:
+        name: caddy
+        state: stopped
+      ignore_errors: true
 
     - name: Obtain SSL certificate
       ansible.builtin.command:
@@ -161,18 +210,51 @@
       changed_when: false
       when: not ansible_check_mode
 
+    - name: Check if Ergo config exists
+      ansible.builtin.stat:
+        path: /etc/ergo/ircd.yaml
+      register: ergo_config_stat
+
+    - name: Get existing Ergo config
+      ansible.builtin.slurp:
+        src: /etc/ergo/ircd.yaml
+      register: ergo_config_file
+      when: ergo_config_stat.stat.exists
+      ignore_errors: true
+
+    - name: Extract existing hashes
+      ansible.builtin.set_fact:
+        existing_server_hash: "{{ (((ergo_config_file.content | default('') | b64decode | from_yaml) or {}).server | default({}, true)).password | default('') if ergo_config_file.content is defined else '' }}"
+        existing_oper_hash: "{{ ((((ergo_config_file.content | default('') | b64decode | from_yaml) or {}).opers | default({}, true)).admin | default({}, true)).password | default('') if ergo_config_file.content is defined else '' }}"
+      when: ergo_config_stat.stat.exists and ergo_config_file.failed is not defined
+      ignore_errors: true
+
     - name: Generate server password hash
       ansible.builtin.shell: |
-        echo "{{ server_password.stdout }}" | /usr/local/bin/ergo genpasswd
+        if [ -n "$EXISTING_HASH" ] && python3 -c "import bcrypt, sys, os; sys.exit(0 if bcrypt.checkpw(os.environ['PASSWORD'].encode(), os.environ['EXISTING_HASH'].encode()) else 1)"; then
+            echo "$EXISTING_HASH"
+        else
+            echo "$PASSWORD" | /usr/local/bin/ergo genpasswd
+        fi
+      environment:
+        PASSWORD: "{{ server_password.stdout }}"
+        EXISTING_HASH: "{{ existing_server_hash | default('') }}"
       register: server_password_hash
-      changed_when: false
+      changed_when: server_password_hash.stdout != existing_server_hash | default('')
       when: not ansible_check_mode
 
     - name: Generate oper password hash
       ansible.builtin.shell: |
-        echo "{{ oper_password.stdout }}" | /usr/local/bin/ergo genpasswd
+        if [ -n "$EXISTING_HASH" ] && python3 -c "import bcrypt, sys, os; sys.exit(0 if bcrypt.checkpw(os.environ['PASSWORD'].encode(), os.environ['EXISTING_HASH'].encode()) else 1)"; then
+            echo "$EXISTING_HASH"
+        else
+            echo "$PASSWORD" | /usr/local/bin/ergo genpasswd
+        fi
+      environment:
+        PASSWORD: "{{ oper_password.stdout }}"
+        EXISTING_HASH: "{{ existing_oper_hash | default('') }}"
       register: oper_password_hash
-      changed_when: false
+      changed_when: oper_password_hash.stdout != existing_oper_hash | default('')
       when: not ansible_check_mode
 
     - name: Write Ergo config
@@ -208,6 +290,9 @@
         name: ergo
         enabled: true
         state: started
+
+    - name: Register users from secrets
+      ansible.builtin.import_tasks: user_registration_tasks.yml
 
     - name: Create irccat user
       ansible.builtin.user:
@@ -266,6 +351,12 @@
         mode: "0600"
       notify: Restart irccat
 
+    - name: Fetch irccat password from Secret Manager
+      ansible.builtin.command: gcloud secrets versions access latest --secret=irccat-irc-passwd --project={{ project_id }}
+      register: irccat_password
+      changed_when: false
+      when: not ansible_check_mode
+
     - name: Write irccat config
       ansible.builtin.template:
         src: templates/irccat.json.j2
@@ -300,6 +391,66 @@
         enabled: true
         state: started
 
+    - name: Install The Lounge
+      ansible.builtin.command:
+        cmd: npm install -g thelounge
+        creates: /usr/bin/thelounge
+
+    - name: Create thelounge user
+      ansible.builtin.user:
+        name: thelounge
+        system: true
+        shell: /usr/sbin/nologin
+        home: /var/lib/thelounge
+        create_home: yes
+
+    - name: Write The Lounge config
+      ansible.builtin.template:
+        src: templates/config.js.j2
+        dest: /var/lib/thelounge/config.js
+        owner: thelounge
+        group: thelounge
+        mode: '0640'
+      notify: Restart thelounge
+
+    - name: Create The Lounge systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/thelounge.service
+        content: |
+          [Unit]
+          Description=The Lounge (IRC Client)
+          After=network.target
+
+          [Service]
+          Type=simple
+          User=thelounge
+          Environment=THELOUNGE_HOME=/var/lib/thelounge
+          ExecStart=/usr/bin/thelounge start
+          Restart=always
+
+          [Install]
+          WantedBy=multi-user.target
+      notify: Restart thelounge
+
+    - name: Enable and start The Lounge
+      ansible.builtin.systemd:
+        name: thelounge
+        enabled: true
+        state: started
+        daemon_reload: true
+
+    - name: Configure Caddy
+      ansible.builtin.template:
+        src: templates/Caddyfile.j2
+        dest: /etc/caddy/Caddyfile
+      notify: Restart caddy
+
+    - name: Enable and start Caddy
+      ansible.builtin.systemd:
+        name: caddy
+        enabled: true
+        state: started
+
   handlers:
     - name: Restart ergo
       ansible.builtin.systemd:
@@ -309,4 +460,14 @@
     - name: Restart irccat
       ansible.builtin.systemd:
         name: irccat
+        state: restarted
+
+    - name: Restart thelounge
+      ansible.builtin.systemd:
+        name: thelounge
+        state: restarted
+
+    - name: Restart caddy
+      ansible.builtin.systemd:
+        name: caddy
         state: restarted

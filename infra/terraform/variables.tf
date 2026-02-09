@@ -107,3 +107,13 @@ variable "cloudflare_manage_dns" {
   description = "Whether Terraform should manage the Cloudflare DNS record."
   default     = true
 }
+
+variable "user_passwords" {
+  type        = map(string)
+  description = "Map of username to password (optional), used to seed keys in Secret Manager. If value is empty, a random password is generated."
+  default     = {
+    "bwilson"  = ""
+    "irccat"   = ""
+    "openclaw" = ""
+  }
+}

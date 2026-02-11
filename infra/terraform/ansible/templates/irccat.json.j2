@@ -4,7 +4,7 @@
     "tls": false,
     "listeners": {
       "generic": {
-        "secret": "{{ server_password.stdout }}",
+        "secret": "__SERVER_PASSWORD__",
         "strict": true
       }
     }
@@ -15,7 +15,7 @@
     "nick": "irccat",
     "realname": "IRCCat",
     "sasl_user": "irccat",
-    "sasl_pass": "{{ irccat_password.stdout }}",
+    "sasl_pass": "__IRCCAT_PASSWORD__",
     "channels": ["#analyze-this"]
   }
 }

@@ -6,8 +6,6 @@ server:
     name: "{{ server_name }}"
 
     listeners:
-        ":6667":
-
         ":6697":
             tls:
                 cert: /etc/ergo/ssl/server.crt
@@ -16,15 +14,6 @@ server:
 
     unix-bind-mode: 0777
 
-    tor-listeners:
-        require-sasl: false
-
-        vhost: "tor-network.onion"
-
-        max-connections: 64
-
-        throttle-duration: 10m
-        max-connections-per-duration: 64
 
     sts:
         enabled: false
@@ -37,6 +26,8 @@ server:
 
     websockets:
         allowed-origins:
+        - "https://{{ server_name }}"
+        - "https://{{ server_name }}:443"
 
     casemapping: "ascii"
 
@@ -47,7 +38,7 @@ server:
 
     check-ident: true
 
-    password: "{{ server_password_hash.stdout }}"
+    # password: "__SERVER_PASSWORD_HASH__"
 
     motd: ergo.motd
 
@@ -70,14 +61,12 @@ server:
 
     webirc:
         -
-            certfp: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
-
-            password: "{{ oper_password_hash.stdout }}"
+            password: "__WEBIRC_PASSWORD_HASH__"
 
             hosts:
                 - localhost
-
-            accept-hostname: true
+                - 127.0.0.1
+                - ::1
 
     max-sendq: 96k
 
@@ -171,7 +160,7 @@ accounts:
 
         max-attempts: 3
 
-    skip-server-password: false
+    skip-server-password: true
 
     login-via-pass-command: false
 
@@ -194,7 +183,7 @@ accounts:
 
         guest-nickname-format: "Guest-*"
 
-        force-guest-format: false
+        force-guest-format: true
 
         force-nick-equals-account: false
 
@@ -253,7 +242,7 @@ channels:
     registration:
         enabled: true
 
-        operator-only: false
+        operator-only: true
 
         max-channels-per-account: 15
 
@@ -300,7 +289,7 @@ opers:
 
         vhost: "staff"
 
-        password: "{{ oper_password_hash.stdout }}"
+        password: "__OPER_PASSWORD_HASH__"
 
 logging:
     -
@@ -321,12 +310,11 @@ datastore:
     autoupgrade: true
 
     mysql:
-        enabled: false
-        host: "localhost"
-        port: 3306
-        user: "ergo"
-        password: "hunter2"
-        history-database: "ergo_history"
+        enabled: true
+        socket-path: "/var/run/mysqld/mysqld.sock"
+        user: "{{ mysql_user }}"
+        password: "__MYSQL_PASSWORD__"
+        history-database: "{{ mysql_database }}"
         timeout: 3s
         max-conns: 4
 
@@ -416,7 +404,7 @@ history:
         grace-period: 1h
 
     persistent:
-        enabled: false
+        enabled: true
 
         unregistered-channels: false
 

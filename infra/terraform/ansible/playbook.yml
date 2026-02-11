@@ -8,7 +8,10 @@
     irc_port_internal: 6667
     secret_server_password: irc-server-password
     secret_oper_password: irc-oper-password
+    secret_mysql_password: ergo-mysql-password
     project_id: "analyze-this-2026"
+    mysql_user: ergo
+    mysql_database: ergo_history
   tasks:
     - name: Update apt cache
       ansible.builtin.apt:
@@ -25,6 +28,8 @@
           - golang-go
           - git
           - python3-bcrypt
+          - default-mysql-server
+          - python3-pymysql
         state: present
 
     - name: Download and dearmor Google Cloud SDK GPG key
@@ -100,11 +105,58 @@
         enabled: no
       ignore_errors: true
 
+    - name: Ensure MySQL is started
+      ansible.builtin.systemd:
+        name: mysql
+        state: started
+        enabled: true
+
+    - name: Fetch MySQL password from GCP Secret Manager
+      ansible.builtin.command:
+        cmd: gcloud secrets versions access latest --secret={{ secret_mysql_password }} --project={{ project_id }}
+      register: mysql_password_result
+      changed_when: false
+
+    - name: Set MySQL password fact
+      ansible.builtin.set_fact:
+        mysql_password: "{{ mysql_password_result.stdout }}"
+      no_log: true
+
+    - name: Create MySQL database for Ergo
+      community.mysql.mysql_db:
+        name: "{{ mysql_database }}"
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+
+    - name: Create MySQL user for Ergo
+      community.mysql.mysql_user:
+        name: "{{ mysql_user }}"
+        password: "{{ mysql_password }}"
+        priv: "{{ mysql_database }}.*:ALL"
+        host: localhost
+        state: present
+        login_unix_socket: /var/run/mysqld/mysqld.sock
+      no_log: true
+
     - name: Create ergo user
       ansible.builtin.user:
         name: ergo
         system: true
         shell: /usr/sbin/nologin
+
+    - name: Create irccat user
+      ansible.builtin.user:
+        name: irccat
+        system: true
+        shell: /usr/sbin/nologin
+
+    - name: Create thelounge user
+      ansible.builtin.user:
+        name: thelounge
+        system: true
+        shell: /usr/sbin/nologin
+        home: /var/lib/thelounge
+        create_home: yes
 
     - name: Download Ergo archive
       ansible.builtin.unarchive:
@@ -190,81 +242,51 @@
         enabled: true
         state: started
 
-    - name: Set placeholder passwords in check mode
-      ansible.builtin.set_fact:
-        server_password:
-          stdout: "CHECK_MODE_SERVER_PASS"
-        oper_password:
-          stdout: "CHECK_MODE_OPER_PASS"
-      when: ansible_check_mode
+    - name: Install setup_secrets script
+      ansible.builtin.template:
+        src: templates/setup_secrets.sh.j2
+        dest: /usr/local/bin/setup_secrets.sh
+        mode: "0755"
+        owner: root
+        group: root
 
-    - name: Fetch server password from Secret Manager
-      ansible.builtin.command: gcloud secrets versions access latest --secret={{ secret_server_password }} --project={{ project_id }}
-      register: server_password
-      changed_when: false
-      when: not ansible_check_mode
+    - name: Create setup-secrets systemd service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/setup-secrets.service
+        content: |
+          [Unit]
+          Description=Fetch and Setup Secrets
+          After=network.target
 
-    - name: Fetch oper password from Secret Manager
-      ansible.builtin.command: gcloud secrets versions access latest --secret={{ secret_oper_password }} --project={{ project_id }}
-      register: oper_password
-      changed_when: false
-      when: not ansible_check_mode
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/local/bin/setup_secrets.sh
+          RemainAfterExit=yes
 
-    - name: Check if Ergo config exists
-      ansible.builtin.stat:
-        path: /etc/ergo/ircd.yaml
-      register: ergo_config_stat
+          [Install]
+          WantedBy=multi-user.target
+      notify: Reload systemd
 
-    - name: Get existing Ergo config
-      ansible.builtin.slurp:
-        src: /etc/ergo/ircd.yaml
-      register: ergo_config_file
-      when: ergo_config_stat.stat.exists
-      ignore_errors: true
+    - name: Reload systemd daemon
+      ansible.builtin.systemd:
+        daemon_reload: true
 
-    - name: Extract existing hashes
-      ansible.builtin.set_fact:
-        existing_server_hash: "{{ (((ergo_config_file.content | default('') | b64decode | from_yaml) or {}).server | default({}, true)).password | default('') if ergo_config_file.content is defined else '' }}"
-        existing_oper_hash: "{{ ((((ergo_config_file.content | default('') | b64decode | from_yaml) or {}).opers | default({}, true)).admin | default({}, true)).password | default('') if ergo_config_file.content is defined else '' }}"
-      when: ergo_config_stat.stat.exists and ergo_config_file.failed is not defined
-      ignore_errors: true
+    - name: Enable and start setup-secrets
+      ansible.builtin.systemd:
+        name: setup-secrets
+        enabled: true
+        state: started
 
-    - name: Generate server password hash
-      ansible.builtin.shell: |
-        if [ -n "$EXISTING_HASH" ] && python3 -c "import bcrypt, sys, os; sys.exit(0 if bcrypt.checkpw(os.environ['PASSWORD'].encode(), os.environ['EXISTING_HASH'].encode()) else 1)"; then
-            echo "$EXISTING_HASH"
-        else
-            echo "$PASSWORD" | /usr/local/bin/ergo genpasswd
-        fi
-      environment:
-        PASSWORD: "{{ server_password.stdout }}"
-        EXISTING_HASH: "{{ existing_server_hash | default('') }}"
-      register: server_password_hash
-      changed_when: server_password_hash.stdout != existing_server_hash | default('')
-      when: not ansible_check_mode
-
-    - name: Generate oper password hash
-      ansible.builtin.shell: |
-        if [ -n "$EXISTING_HASH" ] && python3 -c "import bcrypt, sys, os; sys.exit(0 if bcrypt.checkpw(os.environ['PASSWORD'].encode(), os.environ['EXISTING_HASH'].encode()) else 1)"; then
-            echo "$EXISTING_HASH"
-        else
-            echo "$PASSWORD" | /usr/local/bin/ergo genpasswd
-        fi
-      environment:
-        PASSWORD: "{{ oper_password.stdout }}"
-        EXISTING_HASH: "{{ existing_oper_hash | default('') }}"
-      register: oper_password_hash
-      changed_when: oper_password_hash.stdout != existing_oper_hash | default('')
-      when: not ansible_check_mode
-
-    - name: Write Ergo config
+    - name: Write Ergo config template
       ansible.builtin.template:
         src: templates/ergo.yaml.j2
-        dest: /etc/ergo/ircd.yaml
+        dest: /etc/ergo/ircd.yaml.template
         owner: ergo
         group: ergo
         mode: "0640"
-      notify: Restart ergo
+      notify:
+        - Run setup-secrets
+        - Restart ergo
 
     - name: Write Ergo systemd unit
       ansible.builtin.copy:
@@ -272,7 +294,8 @@
         content: |
           [Unit]
           Description=Ergo IRC Server
-          After=network.target
+          After=network.target setup-secrets.service
+          Requires=setup-secrets.service
 
           [Service]
           Type=simple
@@ -294,11 +317,7 @@
     - name: Register users from secrets
       ansible.builtin.import_tasks: user_registration_tasks.yml
 
-    - name: Create irccat user
-      ansible.builtin.user:
-        name: irccat
-        system: true
-        shell: /usr/sbin/nologin
+
 
     - name: Clone irccat repository
       ansible.builtin.git:
@@ -333,20 +352,16 @@
 
 
 
-    - name: Fetch irccat password from Secret Manager
-      ansible.builtin.command: gcloud secrets versions access latest --secret=irccat-irc-passwd --project={{ project_id }}
-      register: irccat_password
-      changed_when: false
-      when: not ansible_check_mode
-
-    - name: Write irccat config
+    - name: Write irccat config template
       ansible.builtin.template:
         src: templates/irccat.json.j2
-        dest: /etc/irccat/irccat.json
+        dest: /etc/irccat/irccat.json.template
         owner: irccat
         group: irccat
         mode: "0640"
-      notify: Restart irccat
+      notify:
+        - Run setup-secrets
+        - Restart irccat
 
     - name: Write irccat systemd unit
       ansible.builtin.copy:
@@ -354,7 +369,8 @@
         content: |
           [Unit]
           Description=IRCCat
-          After=network.target ergo.service
+          After=network.target ergo.service setup-secrets.service
+          Requires=setup-secrets.service
 
           [Service]
           Type=simple
@@ -378,22 +394,18 @@
         cmd: npm install -g thelounge
         creates: /usr/bin/thelounge
 
-    - name: Create thelounge user
-      ansible.builtin.user:
-        name: thelounge
-        system: true
-        shell: /usr/sbin/nologin
-        home: /var/lib/thelounge
-        create_home: yes
 
-    - name: Write The Lounge config
+
+    - name: Write The Lounge config template
       ansible.builtin.template:
         src: templates/config.js.j2
-        dest: /var/lib/thelounge/config.js
+        dest: /var/lib/thelounge/config.js.template
         owner: thelounge
         group: thelounge
         mode: '0640'
-      notify: Restart thelounge
+      notify:
+        - Run setup-secrets
+        - Restart thelounge
 
     - name: Create The Lounge systemd service
       ansible.builtin.copy:
@@ -401,7 +413,8 @@
         content: |
           [Unit]
           Description=The Lounge (IRC Client)
-          After=network.target
+          After=network.target setup-secrets.service
+          Requires=setup-secrets.service
 
           [Service]
           Type=simple
@@ -465,6 +478,15 @@
         state: started
 
   handlers:
+    - name: Reload systemd
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Run setup-secrets
+      ansible.builtin.systemd:
+        name: setup-secrets
+        state: restarted
+
     - name: Restart ergo
       ansible.builtin.systemd:
         name: ergo

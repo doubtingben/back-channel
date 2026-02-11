@@ -314,8 +314,8 @@
         enabled: true
         state: started
 
-    # Note: IRC user account registration is handled by the separate irc_accounts.yml playbook
-    # Run it with: ansible-playbook -i inventory.ini irc_accounts.yml -e "action=register"
+    # Note: IRC user account registration is handled by the irc-accounts Go tool
+    # Installed below at /usr/local/bin/irc-accounts
 
 
     - name: Clone irccat repository
@@ -325,9 +325,49 @@
         version: master
         force: yes
 
+    - name: Download Go toolchain (1.22.4)
+      ansible.builtin.get_url:
+        url: https://go.dev/dl/go1.22.4.linux-amd64.tar.gz
+        dest: /tmp/go1.22.4.linux-amd64.tar.gz
+        mode: "0644"
+
+    - name: Extract Go toolchain
+      ansible.builtin.unarchive:
+        src: /tmp/go1.22.4.linux-amd64.tar.gz
+        dest: /usr/local
+        remote_src: true
+        creates: /usr/local/go-1.22.4/bin/go
+
+    - name: Symlink Go toolchain
+      ansible.builtin.file:
+        src: /usr/local/go-1.22.4
+        dest: /usr/local/go
+        state: link
+
+    - name: Copy irc-accounts tool source
+      ansible.builtin.copy:
+        src: ../../tools/irc-accounts
+        dest: /tmp/irc-accounts-src
+        mode: "0755"
+        owner: root
+        group: root
+
+    - name: Build irc-accounts
+      ansible.builtin.command:
+        cmd: /usr/local/go/bin/go build -o irc-accounts
+        chdir: /tmp/irc-accounts-src/irc-accounts
+      changed_when: true
+
+    - name: Install irc-accounts binary
+      ansible.builtin.copy:
+        src: /tmp/irc-accounts-src/irc-accounts/irc-accounts
+        dest: /usr/local/bin/irc-accounts
+        mode: "0755"
+        remote_src: true
+
     - name: Build irccat
       ansible.builtin.command:
-        cmd: go build -o irccat
+        cmd: /usr/local/go/bin/go build -o irccat
         chdir: /tmp/irccat-src
       changed_when: true
 

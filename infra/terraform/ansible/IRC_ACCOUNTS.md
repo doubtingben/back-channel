@@ -1,6 +1,6 @@
 # IRC Account Management
 
-This playbook manages user accounts on the Ergo IRC server.
+This playbook is now superseded by the Go tool in `infra/tools/irc-accounts`. Use the new binary for account management. The default action is now `list`.
 
 ## Prerequisites
 
@@ -8,14 +8,16 @@ This playbook manages user accounts on the Ergo IRC server.
 - You must have operator credentials stored in GCP Secret Manager
 - User passwords must be stored in GCP secrets with the pattern `<username>-irc-passwd`
 
-## Usage
+## Usage (Go Tool)
 
 ### Register All IRC Accounts
 
 This registers all users whose passwords are stored in GCP secrets:
 
 ```bash
-ansible-playbook -i inventory.ini irc_accounts.yml -e "action=register"
+cd infra/tools/irc-accounts
+go build -o irc-accounts
+./irc-accounts -action register
 ```
 
 ### Register a Specific User
@@ -23,7 +25,7 @@ ansible-playbook -i inventory.ini irc_accounts.yml -e "action=register"
 To register just one user:
 
 ```bash
-ansible-playbook -i inventory.ini irc_accounts.yml -e "action=register" -e "specific_user=irccat"
+./irc-accounts -action register -specific-user irccat
 ```
 
 ### Unregister a User
@@ -31,7 +33,7 @@ ansible-playbook -i inventory.ini irc_accounts.yml -e "action=register" -e "spec
 To remove a user account:
 
 ```bash
-ansible-playbook -i inventory.ini irc_accounts.yml -e "action=unregister" -e "specific_user=irccat"
+./irc-accounts -action unregister -specific-user irccat
 ```
 
 ### Reset All Accounts (Nuclear Option)
@@ -44,7 +46,7 @@ This will:
 5. Restart services
 
 ```bash
-ansible-playbook -i inventory.ini irc_accounts.yml -e "action=reset_all"
+./irc-accounts -action reset_all
 ```
 
 **⚠️ Warning**: This will delete all existing accounts, channels, and history!
@@ -59,17 +61,15 @@ Example:
 - Secret value: `your_password_here`
 - Resulting account: `irccat` with the password from the secret
 
-## Variables
+## Flags
 
-You can override these variables with `-e`:
-
-- `action`: What operation to perform
+- `-action`: What operation to perform
   - `register` - Register users (default)
   - `unregister` - Remove users
   - `reset_all` - Nuclear reset of all accounts
-- `specific_user`: Username to target (optional, for register/unregister)
-- `project_id`: GCP project ID (default: `analyze-this-2026`)
-- `secret_oper_password`: Name of the operator password secret (default: `irc-oper-password`)
+- `-specific-user`: Username to target (optional, for register/unregister)
+- `-project-id`: GCP project ID (default: `analyze-this-2026`)
+- `-secret-oper-password`: Name of the operator password secret (default: `irc-oper-password`)
 
 ## Examples
 
@@ -77,10 +77,10 @@ You can override these variables with `-e`:
 
 ```bash
 # Unregister the old account
-ansible-playbook -i inventory.ini irc_accounts.yml -e "action=unregister" -e "specific_user=irccat"
+./irc-accounts -action unregister -specific-user irccat
 
 # Register it fresh
-ansible-playbook -i inventory.ini irc_accounts.yml -e "action=register" -e "specific_user=irccat"
+./irc-accounts -action register -specific-user irccat
 ```
 
 ### Add a new bot account
@@ -90,7 +90,7 @@ ansible-playbook -i inventory.ini irc_accounts.yml -e "action=register" -e "spec
 gcloud secrets create mybot-irc-passwd --data-file=- <<< "strong_password_here" --project=analyze-this-2026
 
 # 2. Register the account
-ansible-playbook -i inventory.ini irc_accounts.yml -e "action=register" -e "specific_user=mybot"
+./irc-accounts -action register -specific-user mybot
 ```
 
 ## Troubleshooting

@@ -15,18 +15,13 @@
         # Get password payload
         PASSWORD=$(gcloud secrets versions access latest --secret="$SECRET_NAME" --project="{{ project_id }}")
         
-        # Register user via manage-db. This works directly on the DB file, so Ergo *might* need to be stopped or it handles locking.
-        # Ideally we use an OPER command if Ergo is running, but manage-db is easier to script if offline.
-        # The ergo manual says `ergo run --manage-db` commands operate on the database.
-        # They should be safe to run on a running server if using SQLite/MySQL with proper locking.
-        
-        # We can use `ergo manage-db saregister`
-        /usr/local/bin/ergo manage-db saregister --conf /etc/ergo/ircd.yaml "$USERNAME" "$PASSWORD" "$USERNAME@localhost" || true
+        # Register user via manage-db as the ergo user
+        # Using sudo -u instead of become_user to avoid ACL permission issues
+        sudo -u ergo /usr/local/bin/ergo manage-db saregister --conf /etc/ergo/ircd.yaml "$USERNAME" "$PASSWORD" "$USERNAME@localhost" || true
       loop: "{{ secret_list.stdout_lines | select('search', '-irc-passwd$') | list }}"
       args:
         executable: /bin/bash
       become: true
-      become_user: ergo
       register: user_registration_result
       changed_when: "'successfully created account' in user_registration_result.stdout"
       ignore_errors: true

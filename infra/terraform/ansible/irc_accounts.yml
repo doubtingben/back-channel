@@ -1,0 +1,187 @@
+---
+- name: Manage IRC user accounts
+  hosts: irc
+  become: true
+  vars:
+    project_id: "analyze-this-2026"
+    secret_oper_password: irc-oper-password
+    action: "register"  # Options: register, unregister, reset_all
+    specific_user: ""   # Optional: specify a specific username to register/unregister
+  tasks:
+    - name: Verify Ergo is running
+      ansible.builtin.wait_for:
+        host: localhost
+        port: 6697
+        state: started
+        timeout: 10
+      when: not ansible_check_mode
+
+    - name: Get oper password for IRC operations
+      ansible.builtin.command:
+        cmd: gcloud secrets versions access latest --secret={{ secret_oper_password }} --project={{ project_id }}
+      register: oper_password_result
+      changed_when: false
+      when: not ansible_check_mode
+      no_log: true
+
+    - name: Set oper password fact
+      ansible.builtin.set_fact:
+        oper_password: "{{ oper_password_result.stdout }}"
+      no_log: true
+      when: not ansible_check_mode
+
+    - name: Get list of IRC account secrets from GCP
+      ansible.builtin.command: 
+        cmd: gcloud secrets list --project={{ project_id }} --format="value(name)"
+      register: secret_list
+      changed_when: false
+      when: not ansible_check_mode and action in ['register', 'reset_all']
+
+    - name: Filter for IRC password secrets
+      ansible.builtin.set_fact:
+        irc_secrets: "{{ secret_list.stdout_lines | select('search', '-irc-passwd$') | list }}"
+      when: not ansible_check_mode and action in ['register', 'reset_all']
+
+    - name: Filter for specific user if provided
+      ansible.builtin.set_fact:
+        irc_secrets: "{{ irc_secrets | select('match', '^' + specific_user + '-irc-passwd$') | list }}"
+      when: not ansible_check_mode and specific_user != "" and action in ['register', 'unregister']
+
+    - name: Display accounts to be processed
+      ansible.builtin.debug:
+        msg: "Will {{ action }} account(s): {{ irc_secrets | map('regex_replace', '-irc-passwd$', '') | list }}"
+      when: not ansible_check_mode and action in ['register', 'reset_all']
+
+    - name: Reset all IRC accounts (drop database)
+      block:
+        - name: Stop services
+          ansible.builtin.systemd:
+            name: "{{ item }}"
+            state: stopped
+          loop:
+            - irccat
+            - thelounge
+            - ergo
+          ignore_errors: true
+
+        - name: Backup existing database
+          ansible.builtin.command:
+            cmd: mv /var/lib/ergo/ircd.db /var/lib/ergo/ircd.db.backup.{{ ansible_date_time.epoch }}
+          become_user: ergo
+          args:
+            removes: /var/lib/ergo/ircd.db
+
+        - name: Reinitialize database
+          ansible.builtin.command:
+            cmd: /usr/local/bin/ergo initdb --conf /etc/ergo/ircd.yaml
+          become_user: ergo
+          changed_when: true
+
+        - name: Start Ergo
+          ansible.builtin.systemd:
+            name: ergo
+            state: started
+
+        - name: Wait for Ergo to be ready
+          ansible.builtin.wait_for:
+            host: localhost
+            port: 6697
+            state: started
+            timeout: 30
+      when: not ansible_check_mode and action == 'reset_all'
+
+    - name: Register IRC users via NickServ
+      ansible.builtin.shell: |
+        set -euo pipefail
+        SECRET_NAME="{{ item }}"
+        USERNAME=${SECRET_NAME%-irc-passwd}
+        
+        # Get user password
+        PASSWORD=$(gcloud secrets versions access latest --secret="$SECRET_NAME" --project="{{ project_id }}")
+        
+        # Create a temporary IRC registration script
+        REG_SCRIPT=$(mktemp)
+        trap "rm -f $REG_SCRIPT" EXIT
+        
+        cat > "$REG_SCRIPT" << 'INNEREOF'
+        #!/bin/bash
+        OPER_PASS="$1"
+        USERNAME="$2"
+        USER_PASS="$3"
+        
+        # Connect to IRC and register the account via operator
+        {
+          sleep 1
+          echo "NICK OperBot$$"
+          echo "USER operbot 0 * :Operator Bot"
+          sleep 2
+          echo "OPER admin $OPER_PASS"
+          sleep 1
+          echo "NS SAREGISTER $USERNAME $USER_PASS ${USERNAME}@localhost"
+          sleep 1
+          echo "QUIT :Registration complete"
+        } | timeout 15 openssl s_client -connect localhost:6697 -quiet -no_ign_eof 2>&1 | grep -i "successfully registered\|already registered\|illegal\|error" || true
+        INNEREOF
+        
+        chmod +x "$REG_SCRIPT"
+        "$REG_SCRIPT" "{{ oper_password }}" "$USERNAME" "$PASSWORD"
+      loop: "{{ irc_secrets }}"
+      args:
+        executable: /bin/bash
+      register: user_registration_result
+      changed_when: "'successfully registered' in user_registration_result.stdout"
+      when: not ansible_check_mode and action in ['register', 'reset_all']
+      no_log: true
+
+    - name: Unregister IRC users via NickServ
+      ansible.builtin.shell: |
+        set -euo pipefail
+        SECRET_NAME="{{ item }}"
+        USERNAME=${SECRET_NAME%-irc-passwd}
+        
+        # Create a temporary IRC unregistration script
+        UNREG_SCRIPT=$(mktemp)
+        trap "rm -f $UNREG_SCRIPT" EXIT
+        
+        cat > "$UNREG_SCRIPT" << 'INNEREOF'
+        #!/bin/bash
+        OPER_PASS="$1"
+        USERNAME="$2"
+        
+        # Connect to IRC and unregister the account via operator
+        {
+          sleep 1
+          echo "NICK OperBot$$"
+          echo "USER operbot 0 * :Operator Bot"
+          sleep 2
+          echo "OPER admin $OPER_PASS"
+          sleep 1
+          echo "NS SADROP $USERNAME"
+          sleep 1
+          echo "QUIT :Unregistration complete"
+        } | timeout 15 openssl s_client -connect localhost:6697 -quiet -no_ign_eof 2>&1 | grep -i "dropped\|error\|unknown" || true
+        INNEREOF
+        
+        chmod +x "$UNREG_SCRIPT"
+        "$UNREG_SCRIPT" "{{ oper_password }}" "$USERNAME"
+      loop: "{{ irc_secrets | default([specific_user + '-irc-passwd']) }}"
+      args:
+        executable: /bin/bash
+      register: user_unregistration_result
+      changed_when: "'dropped' in user_unregistration_result.stdout"
+      when: not ansible_check_mode and action == 'unregister'
+      no_log: true
+
+    - name: Restart services after account changes
+      ansible.builtin.systemd:
+        name: "{{ item }}"
+        state: restarted
+      loop:
+        - irccat
+        - thelounge
+      ignore_errors: true
+      when: not ansible_check_mode and action in ['register', 'reset_all', 'unregister']
+
+    - name: Display completion message
+      ansible.builtin.debug:
+        msg: "IRC account {{ action }} operation completed"

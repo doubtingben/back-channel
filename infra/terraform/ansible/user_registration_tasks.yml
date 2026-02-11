@@ -6,23 +6,67 @@
       changed_when: false
       when: not ansible_check_mode
 
-    - name: Fetch password and register user
+    - name: Get oper password for IRC registration
+      ansible.builtin.command:
+        cmd: gcloud secrets versions access latest --secret={{ secret_oper_password }} --project={{ project_id }}
+      register: oper_password_result
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Set oper password fact
+      ansible.builtin.set_fact:
+        oper_password: "{{ oper_password_result.stdout }}"
+      no_log: true
+      when: not ansible_check_mode
+
+    - name: Wait for Ergo to be ready
+      ansible.builtin.wait_for:
+        host: localhost
+        port: 6697
+        state: started
+        timeout: 30
+      when: not ansible_check_mode
+
+    - name: Register IRC users via NickServ
       ansible.builtin.shell: |
-        set -o pipefail
+        set -euo pipefail
         SECRET_NAME="{{ item }}"
         USERNAME=${SECRET_NAME%-irc-passwd}
         
-        # Get password payload
+        # Get user password
         PASSWORD=$(gcloud secrets versions access latest --secret="$SECRET_NAME" --project="{{ project_id }}")
         
-        # Register user via manage-db as the ergo user
-        # Using sudo -u instead of become_user to avoid ACL permission issues
-        sudo -u ergo /usr/local/bin/ergo manage-db saregister --conf /etc/ergo/ircd.yaml "$USERNAME" "$PASSWORD" "$USERNAME@localhost" || true
+        # Create a temporary IRC registration script
+        REG_SCRIPT=$(mktemp)
+        trap "rm -f $REG_SCRIPT" EXIT
+        
+        cat > "$REG_SCRIPT" << 'INNEREOF'
+        #!/bin/bash
+        OPER_PASS="$1"
+        USERNAME="$2"
+        USER_PASS="$3"
+        
+        # Connect to IRC and register the account via operator
+        {
+          sleep 1
+          echo "NICK OperBot$$"
+          echo "USER operbot 0 * :Operator Bot"
+          sleep 2
+          echo "OPER admin $OPER_PASS"
+          sleep 1
+          echo "NS SAREGISTER $USERNAME $USER_PASS ${USERNAME}@localhost"
+          sleep 1
+          echo "QUIT :Registration complete"
+        } | timeout 15 openssl s_client -connect localhost:6697 -quiet -no_ign_eof 2>&1 | grep -i "successfully registered\|already registered\|illegal\|error" || true
+        INNEREOF
+        
+        chmod +x "$REG_SCRIPT"
+        "$REG_SCRIPT" "{{ oper_password }}" "$USERNAME" "$PASSWORD"
       loop: "{{ secret_list.stdout_lines | select('search', '-irc-passwd$') | list }}"
       args:
         executable: /bin/bash
       become: true
       register: user_registration_result
-      changed_when: "'successfully created account' in user_registration_result.stdout"
-      ignore_errors: true
+      changed_when: "'successfully registered' in user_registration_result.stdout"
       when: not ansible_check_mode
+      no_log: true

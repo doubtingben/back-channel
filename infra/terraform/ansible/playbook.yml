@@ -314,9 +314,8 @@
         enabled: true
         state: started
 
-    - name: Register users from secrets
-      ansible.builtin.import_tasks: user_registration_tasks.yml
-
+    # Note: IRC user account registration is handled by the separate irc_accounts.yml playbook
+    # Run it with: ansible-playbook -i inventory.ini irc_accounts.yml -e "action=register"
 
 
     - name: Clone irccat repository

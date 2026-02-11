@@ -1,13 +1,13 @@
 import 'dotenv/config';
 import { genkit } from 'genkit';
-import { googleAI, gemini15Flash } from '@genkit-ai/googleai';
+import { googleAI } from '@genkit-ai/googleai';
 import { Client } from 'irc-framework';
 import { getMcpTools } from './mcp.js';
 
 // Configure Genkit
 const ai = genkit({
     plugins: [googleAI()],
-    model: gemini15Flash,
+    model: googleAI.model("gemini-2.5-flash"),
 });
 
 // IRC Configuration
@@ -15,21 +15,15 @@ const IRC_SERVER = process.env.IRC_SERVER || 'chat.interestedparticipant.org';
 const IRC_PORT = parseInt(process.env.IRC_PORT || '6697');
 const IRC_NICK = process.env.IRC_NICK || 'AnalyzeBot';
 const IRC_CHANNEL = process.env.IRC_CHANNEL || '#analyze-this';
-const MCP_SERVER_URL = process.env.MCP_SERVER_URL;
 
 async function run() {
     console.log('Starting AnalyzeBot...');
 
-    // Initialize MCP Tools
+    // Initialize MCP Tools from configured servers
     let tools: any[] = [];
     try {
-        if (MCP_SERVER_URL) {
-            console.log(`Connecting to MCP Server at ${MCP_SERVER_URL}...`);
-            tools = await getMcpTools(ai);
-            console.log(`Loaded ${tools.length} tools from MCP.`);
-        } else {
-            console.warn('MCP_SERVER_URL not set. No tools loaded.');
-        }
+        tools = await getMcpTools(ai);
+        console.log(`Loaded ${tools.length} total tools from MCP servers.`);
     } catch (error) {
         console.error('Failed to load MCP tools:', error);
     }

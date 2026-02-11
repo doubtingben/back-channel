@@ -1,6 +1,6 @@
 # AnalyzeBot Agent
 
-A Genkit-powered IRC agent that connects to Ergo server and uses an MCP server for data access.
+A Genkit-powered IRC agent that connects to Ergo server and uses MCP servers for data access.
 
 ## Setup
 
@@ -11,17 +11,88 @@ A Genkit-powered IRC agent that connects to Ergo server and uses an MCP server f
     IRC_PORT=6697
     IRC_NICK=AnalyzeBot
     IRC_CHANNEL=#analyze-this
-    MCP_SERVER_URL=http://localhost:3000/sse
     GOOGLE_GENAI_API_KEY=your_api_key
     IRC_PASSWORD=your_irc_password (optional)
     ```
 3.  **Build**: `npm run build`
 4.  **Run**: `npm start`
 
+## MCP Server Configuration
+
+The agent supports multiple MCP servers with different transport types. Configure via a JSON file or environment variable.
+
+### Option 1: Config File (Recommended)
+
+Set `MCP_CONFIG_FILE` to point to a JSON configuration file:
+
+```env
+MCP_CONFIG_FILE=./mcp-config.json
+```
+
+Example `mcp-config.json`:
+
+```json
+{
+  "servers": {
+    "firebase": {
+      "type": "sse",
+      "url": "http://localhost:3000/sse"
+    },
+    "filesystem": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]
+    },
+    "sqlite": {
+      "type": "stdio",
+      "command": "uvx",
+      "args": ["mcp-server-sqlite", "--db-path", "./data.db"]
+    }
+  }
+}
+```
+
+### Option 2: Legacy Single URL
+
+For backwards compatibility, you can still use a single SSE server via environment variable:
+
+```env
+MCP_SERVER_URL=http://localhost:3000/sse
+```
+
+### Server Types
+
+#### SSE (Server-Sent Events)
+
+For HTTP-based MCP servers:
+
+```json
+{
+  "type": "sse",
+  "url": "http://localhost:3000/sse"
+}
+```
+
+#### Stdio (Command-based)
+
+For file-based/command MCP servers that communicate via stdin/stdout:
+
+```json
+{
+  "type": "stdio",
+  "command": "npx",
+  "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path"],
+  "env": {
+    "OPTIONAL_ENV_VAR": "value"
+  }
+}
+```
+
 ## Features
 
-- connects to IRC with TLS.
+- Connects to IRC with TLS.
 - Joins `#analyze-this`.
 - Listens for messages addressing the bot.
-- Uses Firebase MCP Server tools to answer user/item/worker queue questions.
+- Supports multiple MCP servers (SSE and stdio transports).
+- Prefixes tool names with server name when multiple servers are configured.
 - Powered by Google Genkit & Gemini 1.5 Flash.

@@ -195,10 +195,10 @@ resource "cloudflare_dns_record" "irc" {
   ttl     = 300
 }
 
-resource "cloudflare_dns_record" "lounge" {
+resource "cloudflare_dns_record" "irccat" {
   count   = var.cloudflare_manage_dns ? 1 : 0
   zone_id = var.cloudflare_zone_id
-  name    = "chat-client"
+  name    = "irccat"
   type    = "A"
   content = google_compute_address.irc_ip.address
   proxied = false

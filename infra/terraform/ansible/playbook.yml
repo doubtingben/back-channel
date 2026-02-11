@@ -4,7 +4,7 @@
   become: true
   vars:
     server_name: chat.interestedparticipant.org
-    client_server_name: chat-client.interestedparticipant.org
+    irccat_hostname: irccat.interestedparticipant.org
     irc_port_internal: 6667
     secret_server_password: irc-server-password
     secret_oper_password: irc-oper-password
@@ -331,25 +331,7 @@
         - /etc/irccat
         - /etc/irccat/ssl
 
-    - name: Copy SSL certificate for irccat
-      ansible.builtin.copy:
-        src: /etc/letsencrypt/live/{{ server_name }}/fullchain.pem
-        dest: /etc/irccat/ssl/server.crt
-        remote_src: true
-        owner: irccat
-        group: irccat
-        mode: "0644"
-      notify: Restart irccat
 
-    - name: Copy SSL key for irccat
-      ansible.builtin.copy:
-        src: /etc/letsencrypt/live/{{ server_name }}/privkey.pem
-        dest: /etc/irccat/ssl/server.key
-        remote_src: true
-        owner: irccat
-        group: irccat
-        mode: "0600"
-      notify: Restart irccat
 
     - name: Fetch irccat password from Secret Manager
       ansible.builtin.command: gcloud secrets versions access latest --secret=irccat-irc-passwd --project={{ project_id }}
@@ -438,6 +420,37 @@
         enabled: true
         state: started
         daemon_reload: true
+
+    - name: Create Caddy SSL directory
+      ansible.builtin.file:
+        path: /etc/caddy/ssl
+        state: directory
+        owner: caddy
+        group: caddy
+        mode: "0750"
+
+    - name: Copy SSL certificate for Caddy
+      ansible.builtin.copy:
+        src: /etc/letsencrypt/live/{{ server_name }}/fullchain.pem
+        dest: /etc/caddy/ssl/server.crt
+        remote_src: true
+        owner: caddy
+        group: caddy
+        mode: "0644"
+      notify: Restart caddy
+
+    - name: Copy SSL key for Caddy
+      ansible.builtin.copy:
+        src: /etc/letsencrypt/live/{{ server_name }}/privkey.pem
+        dest: /etc/caddy/ssl/server.key
+        remote_src: true
+        owner: caddy
+        group: caddy
+        mode: "0600"
+      notify: Restart caddy
+
+    - name: Force all notified handlers to run
+      ansible.builtin.meta: flush_handlers
 
     - name: Configure Caddy
       ansible.builtin.template:

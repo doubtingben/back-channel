@@ -1,3 +1,8 @@
-{{ client_server_name }} {
+{{ server_name }} {
+    tls /etc/caddy/ssl/server.crt /etc/caddy/ssl/server.key
     reverse_proxy 127.0.0.1:9000
+}
+
+{{ irccat_hostname }} {
+    reverse_proxy 127.0.0.1:9001
 }

@@ -1,9 +1,7 @@
 {
   "http": {
-    "listen": ":443",
-    "tls": true,
-    "tls_key": "/etc/irccat/ssl/server.key",
-    "tls_cert": "/etc/irccat/ssl/server.crt",
+    "listen": "127.0.0.1:9001",
+    "tls": false,
     "listeners": {
       "generic": {
         "secret": "{{ server_password.stdout }}",

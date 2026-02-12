@@ -11,11 +11,27 @@ A Genkit-powered IRC agent that connects to Ergo server and uses MCP servers for
     IRC_PORT=6697
     IRC_NICK=AnalyzeBot
     IRC_CHANNEL=#analyze-this
-    GOOGLE_GENAI_API_KEY=your_api_key
+    GOOGLE_GENAI_API_KEY=AIzaSyAxEVyxA3js2HHRwm2fRr6R1-8vDvLuoCc
+
+    # GCP Auth (for Firestore MCP)
+    # GOOGLE_APPLICATION_CREDENTIALS=/this-run/your-key.json
+    # FIREBASE_STORAGE_BUCKET=your-app.appspot.com
     IRC_PASSWORD=your_irc_password (optional)
     ```
 3.  **Build**: `npm run build`
 4.  **Run**: `npm start`
+
+### Docker Authentication (GCP)
+If using the Firestore MCP server in Docker, you must provide service account credentials. 
+1. Place your service account JSON in the project root.
+2. In your `.env`, set the path **relative to the container mount**:
+   ```env
+   GOOGLE_APPLICATION_CREDENTIALS=/this-run/keys.json
+   ```
+3. Run the container with a volume mapping:
+   ```bash
+   docker run --env-file .env -v $(pwd):/this-run ghcr.io/doubtingben/back-channel/agent:latest
+   ```
 
 ## MCP Server Configuration
 

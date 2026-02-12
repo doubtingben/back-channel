@@ -61,7 +61,10 @@ function createTransport(config: McpServerConfig) {
             return new StdioClientTransport({
                 command: config.command,
                 args: config.args,
-                env: config.env,
+                env: {
+                    ...process.env as Record<string, string>,
+                    ...config.env,
+                },
             });
         default:
             throw new Error(`Unknown MCP server type: ${(config as any).type}`);

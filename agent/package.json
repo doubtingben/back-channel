@@ -20,7 +20,7 @@
     "@genkit-ai/googleai": "^1.28.0",
     "@genkit-ai/vertexai": "^1.28.0",
     "@modelcontextprotocol/sdk": "^1.26.0",
-    "@types/node": "^25.2.3",
+    "@types/node": "^22.0.0",
     "dotenv": "^17.2.4",
     "genkit": "^1.28.0",
     "irc-framework": "^4.14.0",

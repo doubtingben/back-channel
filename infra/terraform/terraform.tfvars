@@ -1,0 +1,4 @@
+project_id = "analyze-this-2026"
+region     = "us-central1"
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQCwYIlWBOVinl65PnLNwuwvGHCAjUG+Fm/knoPrxaxIsSd3xwBoKLFBhJ+SOowk9ZUoJIWoX0Z/oAX+2NWwPv6adpKQLsLAONixD36b04qr3rIictj6oDFzVBqwERGvUavQkln5QqltgfNREG1kr4xmpaa1HaffLsjDIHSEedSEvSYLt7cLZeY7/yND4CsMNMgcxZ1jFtVP11QtV49paLMWv0lCieZi72joE8FeTzYM+X2KqXhcRB6kiK5wXBNBqy0JtWO4NdoRKI2GqbPmgFhw7mojZdNosVqhiKI6kmjuDoea4qkBY5Ko/dMAq8CHCI9Mo/TPUjPGCRwHCbz5v8LT bwilson@Mac"
+ssh_username = "debian"

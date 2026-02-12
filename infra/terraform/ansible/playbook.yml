@@ -336,6 +336,12 @@
         src: /tmp/go1.22.4.linux-amd64.tar.gz
         dest: /usr/local
         remote_src: true
+        creates: /usr/local/go/bin/go
+
+    - name: Move Go toolchain into versioned directory
+      ansible.builtin.command:
+        cmd: mv /usr/local/go /usr/local/go-1.22.4
+      args:
         creates: /usr/local/go-1.22.4/bin/go
 
     - name: Symlink Go toolchain
@@ -343,6 +349,7 @@
         src: /usr/local/go-1.22.4
         dest: /usr/local/go
         state: link
+        force: true
 
     - name: Copy irc-accounts tool source
       ansible.builtin.copy:

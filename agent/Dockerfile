@@ -22,7 +22,7 @@ RUN python3 -m venv .venv && \
 # Copy agent source
 WORKDIR /app/agent
 COPY package*.json ./
-RUN npm ci
+RUN npm install
 
 COPY . .
 RUN npm run build

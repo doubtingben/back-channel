@@ -11,7 +11,7 @@ A Genkit-powered IRC agent that connects to Ergo server and uses MCP servers for
     IRC_PORT=6697
     IRC_NICK=AnalyzeBot
     IRC_CHANNEL=#analyze-this
-    GOOGLE_GENAI_API_KEY=AIzaSyAxEVyxA3js2HHRwm2fRr6R1-8vDvLuoCc
+    GOOGLE_GENAI_API_KEY=<>
 
     # GCP Auth (for Firestore MCP)
     # GOOGLE_APPLICATION_CREDENTIALS=/this-run/your-key.json

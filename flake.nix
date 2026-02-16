@@ -12,6 +12,7 @@
       packages = with pkgs; [
         python312
         uv
+        nodejs_22
         # add build tools here if you hit native deps:
         # gcc pkg-config openssl zlib
       ];
@@ -19,6 +20,10 @@
       shellHook = ''
         git config user.email "doubtingben@gmail.com"
         git config user.name "Ben Wilson"
+
+        if [ -d agent ]; then
+          cd agent
+        fi
       '';
     };
   };

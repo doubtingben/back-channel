@@ -12,6 +12,7 @@
     project_id: "analyze-this-2026"
     mysql_user: ergo
     mysql_database: ergo_history
+    secret_irccat_bearer_token: irccat-bearer-token
   tasks:
     - name: Update apt cache
       ansible.builtin.apt:

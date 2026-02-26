@@ -75,7 +75,7 @@ async function run() {
     });
 
     client.on('error', (err: any) => {
-        // console.error('IRC Error:', err);
+        console.error('IRC Error:', err);
     });
 }
 

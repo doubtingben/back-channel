@@ -2,7 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { z } from "genkit";
-import { readFileSync } from "fs";
+import { readFile } from "fs/promises";
 
 // MCP Server Configuration Types
 export interface McpServerConfigSSE {
@@ -24,12 +24,12 @@ export interface McpConfig {
 }
 
 // Load configuration from file or environment
-export function loadMcpConfig(): McpConfig {
+export async function loadMcpConfig(): Promise<McpConfig> {
     // First try loading from config file
     const configPath = process.env.MCP_CONFIG_FILE;
     if (configPath) {
         try {
-            const configContent = readFileSync(configPath, "utf-8");
+            const configContent = await readFile(configPath, "utf-8");
             return JSON.parse(configContent) as McpConfig;
         } catch (error) {
             console.error(`Failed to load MCP config from ${configPath}:`, error);
@@ -86,7 +86,7 @@ export async function getMcpClient(config: McpServerConfig): Promise<Client> {
 }
 
 export async function getMcpTools(ai: any): Promise<any[]> {
-    const config = loadMcpConfig();
+    const config = await loadMcpConfig();
     const serverNames = Object.keys(config.servers);
 
     if (serverNames.length === 0) {
